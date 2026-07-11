@@ -178,6 +178,14 @@
     display: none;
     border: 0;
   }
+  .style-ref-thumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #e3d5da;
+    display: none;
+  }
 
   .result {
     margin-top: 28px;
@@ -238,8 +246,18 @@
 <div class="option-card">
   <h2>✨ AI 프레임 생성 (Cloudflare Workers AI)</h2>
   <div class="row">
-    <textarea id="promptInput" placeholder="예: 핑크 파스텔톤 글리터, 별과 하트 패턴, 텍스트는 넣지 마세요">flat 2D vector illustration sticker design, cute Korean photo booth frame template, hand-drawn doodle style with thick outlines, pastel pink color palette, small bears and stars and hearts scattered only near the borders, flat colors, no photorealism, no photograph, no text, no letters, no watermark</textarea>
+    <textarea id="promptInput" placeholder="원하는 색과 분위기를 적어주세요. 예: 연한 라벤더와 하늘색, 밝고 포근한 느낌">flat 2D storybook illustration, childlike hand-drawn symbols with solid color fills, ultra-bright high-key pure white-ivory background, clean high-chroma palette, at least ninety percent bare and undecorated, dry wax-pastel texture contained inside each shape, very few tiny isolated motifs, simple star, outline heart, small spiral or short line, crisp sharply defined boundaries, saturated red, yellow, green, sky blue, pink and orange</textarea>
   </div>
+  <div class="row">
+    <textarea id="negativePromptInput" placeholder="AI가 피했으면 하는 요소를 영어로, 쉼표로 구분해서 적어주세요">photorealistic, photograph, photographic detail, realistic texture, realistic lighting, material rendering, volumetric shading, 3D render, realistic scene, muddy colors, dull colors, desaturated, gray haze, blotches, stains, smudges, blur, fuzzy edges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, all-over pattern, wallpaper, filled border, repeated motifs, dense ornament, crowded border, clusters, oversized motif, person, character, mascot, animal, face, crayon stick, pencil, marker, art supplies, text, watermark</textarea>
+  </div>
+  <div class="option-status">negative prompt: 여기 적힌 건 "이런 건 넣지 마"라는 뜻으로 전달돼요. 긍정 프롬프트에 "no text"처럼 적는 것보다 여기 적는 게 훨씬 잘 먹혀요.</div>
+  <div class="row" style="align-items:center;">
+    <input type="file" id="styleRefInput" accept="image/*" style="flex:1;min-width:0;font-size:12px;" />
+    <img id="styleRefThumb" class="style-ref-thumb" alt="스타일 참고 이미지 미리보기" />
+    <button class="btn-secondary" id="clearStyleRefBtn" type="button" style="display:none;">참고 이미지 제거</button>
+  </div>
+  <div class="option-status" id="styleRefStatus">선택 사항: 색감·분위기를 따라 하고 싶은 참고 이미지를 올리면 그 톤에 맞춰 테두리를 생성해요.</div>
   <div class="row">
     <button class="btn-primary" id="genFrameBtn" style="flex:1">프레임 생성</button>
     <button class="btn-secondary" id="clearFrameBtn">기본으로</button>
@@ -275,6 +293,11 @@
   const layoutGridRadio = document.getElementById('layoutGrid');
   const titleInput = document.getElementById('titleInput');
   const promptInput = document.getElementById('promptInput');
+  const negativePromptInput = document.getElementById('negativePromptInput');
+  const styleRefInput = document.getElementById('styleRefInput');
+  const styleRefThumb = document.getElementById('styleRefThumb');
+  const clearStyleRefBtn = document.getElementById('clearStyleRefBtn');
+  const styleRefStatus = document.getElementById('styleRefStatus');
   const genFrameBtn = document.getElementById('genFrameBtn');
   const clearFrameBtn = document.getElementById('clearFrameBtn');
   const frameStatus = document.getElementById('frameStatus');
@@ -286,6 +309,40 @@
   let stripFrameImg = null; // 세로 1x4 전체를 한 번에 생성한 연속 프레임
   let stripFrameRequestSize = null;
   let frameLayout = 'strip'; // 'strip' | 'grid'
+  let styleRefImg = null; // 업로드한 스타일 참고 이미지(선택)
+
+  const DEFAULT_STYLE_REF_STATUS = '선택 사항: 색감·분위기를 따라 하고 싶은 참고 이미지를 올리면 그 톤에 맞춰 테두리를 생성해요.';
+  // CLIP 토큰 한계 안에서 실사·어두운 색·큰 무늬 금지를 우선 전달하도록 짧게 유지함.
+  // 손그림 질감은 positive prompt에서 직접 지정하므로 negative에서는 막지 않음.
+  const DEFAULT_NEGATIVE_BASE = 'photorealistic, photograph, photographic detail, realistic texture, realistic lighting, ' +
+    'material rendering, volumetric shading, 3D render, realistic scene, muddy colors, dull colors, desaturated, gray haze, ' +
+    'blotches, stains, smudges, blur, fuzzy edges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, ' +
+    'all-over pattern, wallpaper, filled border, repeated motifs, dense ornament, crowded border, clusters, oversized motif, ' +
+    'person, character, mascot, animal, face, crayon stick, pencil, marker, art supplies, text, watermark';
+
+  styleRefInput.addEventListener('change', async () => {
+    const file = styleRefInput.files && styleRefInput.files[0];
+    if (!file) return;
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    styleRefImg = await loadImage(dataUrl);
+    styleRefThumb.src = dataUrl;
+    styleRefThumb.style.display = 'inline-block';
+    clearStyleRefBtn.style.display = 'inline-block';
+    styleRefStatus.textContent = '참고 이미지 반영됨: 이 이미지의 색감·구도를 어느 정도 따라가며 테두리를 생성해요.';
+  });
+
+  clearStyleRefBtn.addEventListener('click', () => {
+    styleRefImg = null;
+    styleRefInput.value = '';
+    styleRefThumb.style.display = 'none';
+    clearStyleRefBtn.style.display = 'none';
+    styleRefStatus.textContent = DEFAULT_STYLE_REF_STATUS;
+  });
 
   function showError(msg) {
     errorEl.textContent = msg;
@@ -640,15 +697,23 @@
   // 말아야 할 영역(사진이 들어갈 자리)으로 약속되어 있음. 사진 자리는 border만큼
   // 안쪽으로 들어간, 우리가 이미 알고 있는 정확한 좌표(photoW x photoH)로 박아
   // 넣기 때문에 "빈 구역을 나중에 감지"할 필요 자체가 없어짐 — 위치가 100% 코드로 고정됨
-  function buildInpaintingAssets(chipW, chipH, border, photoW, photoH, margin, outputW = chipW, outputH = chipH) {
+  function buildInpaintingAssets(chipW, chipH, border, photoW, photoH, margin, outputW = chipW, outputH = chipH, styleRefImg = null) {
     const scaleX = outputW / chipW;
     const scaleY = outputH / chipH;
     const baseCanvas = document.createElement('canvas');
     baseCanvas.width = outputW;
     baseCanvas.height = outputH;
     const bctx = baseCanvas.getContext('2d');
-    bctx.fillStyle = '#f7ecf0';
+    bctx.fillStyle = '#fff'; // 낮춘 strength에서 밝은 바탕색을 결과에 남기기 위한 베이스
     bctx.fillRect(0, 0, outputW, outputH);
+    // 참고 이미지가 있으면 베이스 이미지 자체를 그 사진으로 채움. 인페인팅에서
+    // strength<1이면 흰 마스크(테두리) 영역이 이 베이스 픽셀에서 얼마나
+    // 벗어날지를 조절하므로, 여기 깔아둔 색/구도가 결과에 은은하게 남게 됨
+    // (검은 마스크=사진 자리는 strength와 무관하게 항상 그대로 보존됨)
+    if (styleRefImg) {
+      const t = getFrameCoverTransform(styleRefImg, 0, 0, outputW, outputH);
+      bctx.drawImage(styleRefImg, t.dx, t.dy, t.dw, t.dh);
+    }
 
     // 마스크의 "건드리지 마" 영역(검정)을 실제 사진 크기보다 margin만큼 더 크게
     // 잡음. 장식용 스크롤/덩굴 무늬가 물리적으로 절대 들어올 수 없는 빈 여백
@@ -671,13 +736,17 @@
     return { baseCanvas, maskCanvas };
   }
 
-  function buildStripInpaintingAssets(size, outputW, outputH) {
+  function buildStripInpaintingAssets(size, outputW, outputH, styleRefImg = null) {
     const baseCanvas = document.createElement('canvas');
     baseCanvas.width = outputW;
     baseCanvas.height = outputH;
     const bctx = baseCanvas.getContext('2d');
-    bctx.fillStyle = '#f7ecf0';
+    bctx.fillStyle = '#fff'; // 인페인팅 요청을 위한 중립 초기 이미지
     bctx.fillRect(0, 0, outputW, outputH);
+    if (styleRefImg) {
+      const t = getFrameCoverTransform(styleRefImg, 0, 0, outputW, outputH);
+      bctx.drawImage(styleRefImg, t.dx, t.dy, t.dw, t.dh);
+    }
 
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = outputW;
@@ -721,7 +790,7 @@
     });
   }
 
-  function isNearlyBlackImage(img) {
+  function getGeneratedImageIssue(img) {
     const canvas = document.createElement('canvas');
     canvas.width = 32;
     canvas.height = 32;
@@ -731,10 +800,64 @@
     ctx.drawImage(img, 0, 0, 32, 32);
     const pixels = ctx.getImageData(0, 0, 32, 32).data;
     let brightness = 0;
+    let edgeBrightness = 0;
+    let edgeCount = 0;
     for (let i = 0; i < pixels.length; i += 4) {
-      brightness += pixels[i] + pixels[i + 1] + pixels[i + 2];
+      const value = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+      brightness += value;
+      const pixelIndex = i / 4;
+      const x = pixelIndex % 32;
+      const y = Math.floor(pixelIndex / 32);
+      if (x < 6 || x >= 26 || y < 4 || y >= 28) {
+        edgeBrightness += value;
+        edgeCount++;
+      }
     }
-    return brightness / (32 * 32 * 3) < 12;
+    const count = 32 * 32;
+    const mean = brightness / count;
+    const edgeMean = edgeBrightness / edgeCount;
+    if (mean < 45 || edgeMean < 55) return '결과가 지나치게 어두움';
+    return '';
+  }
+
+  // 모델이 유효한 무늬 위에 회색 필터를 씌운 듯 출력하는 경우, 검정 이미지
+  // 판정을 통과한 결과에만 밝은 아이보리 screen 보정을 적용한다.
+  async function removeDarkCast(img) {
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    const sample = document.createElement('canvas');
+    sample.width = 24;
+    sample.height = 24;
+    const sctx = sample.getContext('2d', { willReadFrequently: true });
+    sctx.drawImage(img, 0, 0, 24, 24);
+    const pixels = sctx.getImageData(0, 0, 24, 24).data;
+    let sum = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      sum += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+    }
+    const mean = sum / (24 * 24);
+    const canvas = document.createElement('canvas');
+    canvas.width = iw;
+    canvas.height = ih;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    if (mean < 190) {
+      const strength = Math.min(0.45, Math.max(0, (190 - mean) / (255 - mean)));
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = `rgba(255, 252, 245, ${strength})`;
+      ctx.fillRect(0, 0, iw, ih);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // screen 보정으로 옅어진 색을 다시 맑게 복원한다. 대비를 소폭 올려 작은
+    // 도형의 경계도 얼룩처럼 퍼지지 않고 분명하게 보이도록 함.
+    const enhanced = document.createElement('canvas');
+    enhanced.width = iw;
+    enhanced.height = ih;
+    const ectx = enhanced.getContext('2d');
+    ectx.filter = 'saturate(1.28) contrast(1.06)';
+    ectx.drawImage(canvas, 0, 0);
+    return loadImage(enhanced.toDataURL('image/png'));
   }
 
   // 사진을 목표 사각형 안에 늘리지 않고(비율 유지) 꽉 채워 그림 — 초과분은 크롭
@@ -995,8 +1118,10 @@
     const { chipW, chipH, border, photoW, photoH, margin } = size;
     const frameH = isWholeStrip ? size.H : chipH;
     // 긴 원본 비율은 유지하되 생성 해상도를 낮춰 Beta 인페인팅 모델의
-    // 검은 출력과 긴 처리 시간을 줄임.
-    const requestW = isWholeStrip ? 320 : Math.ceil(chipW / 8) * 8;
+    // 검은 출력과 긴 처리 시간을 줄임. 320은 너무 낮아서 뚜렷한 벡터 도형 대신
+    // 뭉개진 그레인/마블 텍스처로 수렴하는 경향이 있어 448로 올려 작은 선이
+    // 큰 덩어리로 합쳐지는 현상도 줄임.
+    const requestW = isWholeStrip ? 448 : Math.ceil(chipW / 8) * 8;
     const requestH = isWholeStrip
       ? Math.ceil((requestW * frameH / size.W) / 8) * 8
       : Math.ceil(frameH / 8) * 8;
@@ -1007,69 +1132,79 @@
     // 얘기를 할 필요가 없고, "테두리만 꾸며줘"라고만 하면 됨 — 위치·크기는
     // 100% 코드가 결정
     const { baseCanvas, maskCanvas } = isWholeStrip
-      ? buildStripInpaintingAssets(size, requestW, requestH)
-      : buildInpaintingAssets(chipW, chipH, border, photoW, photoH, margin, requestW, requestH);
+      ? buildStripInpaintingAssets(size, requestW, requestH, styleRefImg)
+      : buildInpaintingAssets(chipW, chipH, border, photoW, photoH, margin, requestW, requestH, styleRefImg);
     const imageB64 = canvasToBase64Png(baseCanvas);
     const maskBytes = await canvasToByteArray(maskCanvas);
 
-    // 마스크(여백 margin 포함)가 "장식이 못 들어오는 구역"을 물리적으로
-    // 보장하긴 하지만, 프롬프트도 같은 방향으로 맞춰줘야 마스크 경계 바로
-    // 바깥쪽 장식이 안쪽을 향해 휘어 들어오려는 경향 자체를 줄일 수 있음.
-    // 기록용 핵심 단어: "clean/sharp/straight rectangular border",
-    // "plain empty margin", "do not overlap/wrap/curl into the center",
-    // negative에는 "border touching/overlapping/wrapping the photo area",
-    // "ornaments crossing into the center" 계열
-    // 추가: 안쪽 경계 가까이 그려진 자잘한 장식은 사진의 살짝 겹치는 여백
-    // (outset)에 가려져서 안 보이게 됨 — 그런 낭비를 줄이려고 "장식은 바깥쪽
-    // 가장자리에 집중, 안쪽 경계 근처는 단순하게"라고 명시적으로 요청함.
-    // 기록용 핵심 단어: "concentrate/focus decoration near the outer edge",
-    // "keep the area near the inner boundary simple/sparse/plain",
-    // negative에는 "dense/busy decoration near the center or inner edge"
-    const prompt = isWholeStrip
-      ? `${basePrompt}, seamless full-canvas decorative artwork for a tall Korean photo booth strip, ` +
-        `cover the entire canvas edge to edge with a rich detailed coordinated pattern, ` +
-        `varied ornament composition from top to bottom, especially detailed decoration in the bottom footer area, ` +
-        `this is only a continuous decorative background sheet and code will place photos over it later, ` +
-        `do not draw photo openings, windows, empty rectangles, internal frames, grids, black outlines, or text, ` +
-        `avoid blank areas and keep the artwork colorful and detailed across the whole image`
-      : `${basePrompt}, ornate decorative border pattern for the edge of a photo frame, ` +
-        `only decorate the outer border area, ` +
-        `the inner area is a clean sharp straight-edged rectangle with a plain empty margin directly around it, ` +
-        `no decorative elements overlap, wrap around, or curl into the inner rectangle or touch its edge, ` +
-        `keep the center area and the margin around it completely plain and untouched, ` +
-        `concentrate the busiest and most detailed decoration near the outer edge of the image, ` +
-        `keep the area close to the inner boundary simple and sparse since it will be covered`;
+    // SD1.5의 CLIP 텍스트 인코더는 77토큰에서 그냥 잘림(청킹 없음). 예전 버전은
+    // basePrompt 뒤에 100단어 가까운 부가 설명을 더 붙여서 뒷부분(안쪽 경계
+    // 침범 금지 같은 핵심 지시)이 실제로는 인코더에 보이지도 않았을 가능성이
+    // 높았음. 그래서 지금은: (1) 문장을 짧게, (2) 구조적으로 중요한 지시를
+    // 앞쪽에, (3) 긍정 프롬프트에 "no X" 형태의 부정문을 넣지 않음(CLIP이
+    // 부정어를 제대로 처리하지 못해서 오히려 그 단어의 등장 확률만 올릴 수
+    // 있음 — 대신 negativePrompt에만 명시) 원칙으로 재작성함.
+    // 참고 이미지가 있으면 베이스 캔버스가 이미 그 이미지로 채워져 있고
+    // (buildInpaintingAssets/buildStripInpaintingAssets) strength도 아래에서
+    // 낮춰서 그 픽셀이 결과에 남게 함. 프롬프트에는 짧은 문구만 덧붙여 같은
+    // 방향(참고 이미지의 색/구도 유지)을 강화함
+    // 단색으로 수렴하지 않도록 여러 밝은 파스텔 색과 작은 손그림 요소를 적당히
+    // 반복하되, 사진을 방해하지 않을 만큼의 여백은 유지함.
+    const styleRefSuffix = styleRefImg ? ', matching the reference image colors and composition' : '';
+    const requiredDoodleStyle = 'flat 2D storybook illustration, childlike hand-drawn symbols, solid color fills';
+    const guardedBasePrompt = /storybook illustration|hand-drawn symbols|flat 2D/i.test(basePrompt)
+      ? basePrompt
+      : `${requiredDoodleStyle}, ${basePrompt}`;
+    const prompt = (isWholeStrip
+      ? `${guardedBasePrompt}, only five or six tiny isolated motifs across the entire strip, vast bare background`
+      : `${guardedBasePrompt}, only one tiny isolated motif per frame cell, vast bare background`) + styleRefSuffix;
+
+    // negativePrompt는 이제 negativePromptInput에서 직접 편집 가능. 비워두면
+    // 안전한 기본값(DEFAULT_NEGATIVE_BASE)으로 되돌아감. 모드별 구조적 금지
+    // 사항(사진 자리 침범 등)은 사용자가 안 건드리게 항상 코드로 뒤에 붙임
+    const negativeBase = negativePromptInput.value.trim() || DEFAULT_NEGATIVE_BASE;
+    const requiredNoToolNegative = 'crayon stick, crayon object, pencil, marker, drawing tool, art supplies';
+    const guardedToolNegative = /crayon stick|crayon object|drawing tool|art supplies/i.test(negativeBase)
+      ? negativeBase
+      : `${requiredNoToolNegative}, ${negativeBase}`;
+    const requiredNonPhotoNegative = 'photorealistic, photography, photograph, realistic scene, camera image, stock photo, portrait, person, face, body, realistic lighting, 3D render';
+    const guardedNegativeBase = /photorealistic|photography|photograph/i.test(guardedToolNegative)
+      ? guardedToolNegative
+      : `${requiredNonPhotoNegative}, ${guardedToolNegative}`;
     const negativePrompt = isWholeStrip
-      ? 'photo, photograph, person, face, realistic photo, text, letters, watermark, ' +
-        'solid black, black image, large dark regions, blank canvas, empty design, ' +
-        'photo openings, windows, empty rectangles, internal frames, grid, thick black outlines'
-      : 'photo, photograph, person, face, realistic photo, text, letters, watermark, ' +
-        'border overlapping the photo area, ornaments wrapping around the frame opening, ' +
-        'vines or scrollwork crossing into the center, decorations touching the inner edge, ' +
-        'pattern bleeding into the center, uneven or curved inner boundary, ' +
-        'dense or busy decoration near the center, ornamentation crowded close to the inner edge';
+      ? `${guardedNegativeBase}, empty canvas, rectangular openings, grid lines`
+      : `${guardedNegativeBase}, border overlapping the center, decorations crossing the inner edge, busy pattern near the center`;
 
     const compositionVariations = isWholeStrip ? [
-      'a single continuous richly decorated vertical background sheet, no openings or internal borders, ' +
-      'with a strong decorative finish at the bottom'
+      'mostly plain border with isolated doodles'
     ] : [
-      'first frame in a coordinated four-frame series, emphasize decoration across the top and upper corners',
-      'second frame in the same coordinated series, use an asymmetric side-focused arrangement distinct from the first',
-      'third frame in the same coordinated series, use balanced corner accents with a different ornament layout',
-      'fourth and final frame in the same coordinated series, emphasize the bottom and lower corners as a visual ending'
+      'top and upper corners emphasized',
+      'asymmetric side-focused arrangement',
+      'balanced corner accents',
+      'bottom and lower corners emphasized'
     ];
 
+    // 그리드 모드는 4칸을 각각 따로 생성하는데, 매번 완전 랜덤 seed를 쓰면
+    // 같은 basePrompt를 줘도 칸마다 색감/톤이 미묘하게 어긋날 수 있음. 세션당
+    // 공통 seed를 베이스로 잡고 칸마다 작은 오프셋만 주면 같은 팔레트를
+    // 공유하면서 compositionVariations로만 구도 차이가 남. 검은 이미지가 나와
+    // 재시도할 때는 같은 seed를 또 쓰면 또 실패할 수 있어 attempt마다는 계속
+    // 바꿔줌.
+    const sessionSeed = Math.floor(Math.random() * 2000000000);
+    // 기본 생성은 베이스 색을 보존하지 않고 사용자가 프롬프트에 입력한 색을 따름.
+    // 참고 이미지가 있을 때만 해당 이미지의 색과 구도를 보존함.
+    // (검은 마스크=사진 자리는 strength와 무관하게 항상 원본 그대로 보존됨)
+    const genStrength = styleRefImg ? 0.55 : 1;
     try {
       const generatedFrames = [];
       for (let i = 0; i < compositionVariations.length; i++) {
-        const maxAttempts = 2;
+        const maxAttempts = 3;
         let acceptedFrame = null;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           frameStatus.textContent = isWholeStrip
             ? `1×4 세로 프레임 생성 중... (${attempt}/${maxAttempts})`
             : `서로 다른 프레임 생성 중... (${i + 1}/4)`;
 
-          // 서로 다른 seed를 사용해 검은 결과가 나왔을 때 한 번만 재시도함.
           const res = await fetch('/api/generate-frame', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1078,9 +1213,14 @@
               negativePrompt,
               width: requestW, height: requestH,
               image: imageB64, mask: maskBytes,
-              seed: Math.floor(Math.random() * 2147483647),
-              strength: 1,
-              guidance: 7.5
+              seed: (sessionSeed + i * 97 + (attempt - 1) * 7919) % 2147483647,
+              strength: genStrength,
+              // guidance를 낮게 유지하면 "bright/sparse/white background" 같은
+              // 텍스트 지시를 붙잡는 힘도 약해져서 어둡고 밀도 높은 결과로
+              // 흐르는 경향이 있었음. negativePrompt가 이제 오버새추레이션/네온/
+              // 뭉침/텍스처까지 충분히 방어하고 있어서, 원래 기본값(7.5)까지
+              // 밝기는 유지하면서 캔디톤처럼 과하게 선명해지지 않도록 8.0으로 조절
+              guidance: 8.0
             })
           });
 
@@ -1095,18 +1235,21 @@
 
           const mime = data.mime || 'image/jpeg';
           const dataUrl = `data:${mime};base64,${data.image}`;
-          const rawFrameImg = await loadImage(dataUrl);
-          if (isNearlyBlackImage(rawFrameImg)) {
+          let rawFrameImg = await loadImage(dataUrl);
+          const imageIssue = getGeneratedImageIssue(rawFrameImg);
+          if (imageIssue) {
+            frameStatus.textContent = `${imageIssue}: 다른 설정으로 다시 생성하고 있어요...`;
             continue;
           }
-          rawFrameImg.dataUrl = dataUrl;
+          rawFrameImg = await removeDarkCast(rawFrameImg);
+          rawFrameImg.dataUrl = rawFrameImg.src;
           acceptedFrame = isWholeStrip
             ? rawFrameImg
             : await normalizeGeneratedFrameImage(rawFrameImg, chipW, chipH);
           break;
         }
         if (!acceptedFrame) {
-          throw new Error('낮은 해상도와 서로 다른 설정으로 2번 시도했지만 검은 이미지가 반환됐습니다. 잠시 후 다시 시도해주세요.');
+          throw new Error('3번 시도했지만 지나치게 어두운 이미지만 반환됐습니다. 잠시 후 다시 시도해주세요.');
         }
         generatedFrames.push(acceptedFrame);
       }

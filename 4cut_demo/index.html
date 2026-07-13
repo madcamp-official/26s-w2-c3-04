@@ -246,10 +246,10 @@
 <div class="option-card">
   <h2>✨ AI 프레임 생성 (Cloudflare Workers AI)</h2>
   <div class="row">
-    <textarea id="promptInput" placeholder="원하는 색과 분위기를 적어주세요. 예: 연한 라벤더와 하늘색, 밝고 포근한 느낌">flat 2D storybook illustration, childlike hand-drawn symbols with solid color fills, ultra-bright high-key pure white-ivory background, clean high-chroma palette, at least ninety percent bare and undecorated, dry wax-pastel texture contained inside each shape, very few tiny isolated motifs, simple star, outline heart, small spiral or short line, crisp sharply defined boundaries, saturated red, yellow, green, sky blue, pink and orange</textarea>
+    <textarea id="promptInput" placeholder="원하는 색과 분위기를 적어주세요. 예: 연한 라벤더와 하늘색, 밝고 포근한 느낌">flat 2D storybook illustration, childlike hand-drawn symbols with solid color fills, ultra-bright high-key pure white-ivory background, clean high-chroma palette, at least ninety percent bare and undecorated, dry wax-pastel texture contained inside each shape, only one or two tiny isolated motifs of a single kind, a tiny star, crisp sharply defined boundaries, saturated red, yellow, green, sky blue, pink and orange</textarea>
   </div>
   <div class="row">
-    <textarea id="negativePromptInput" placeholder="AI가 피했으면 하는 요소를 영어로, 쉼표로 구분해서 적어주세요">photorealistic, photograph, photographic detail, realistic texture, realistic lighting, material rendering, volumetric shading, 3D render, realistic scene, muddy colors, dull colors, desaturated, gray haze, blotches, stains, smudges, blur, fuzzy edges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, all-over pattern, wallpaper, filled border, repeated motifs, dense ornament, crowded border, clusters, oversized motif, person, character, mascot, animal, face, crayon stick, pencil, marker, art supplies, text, watermark</textarea>
+    <textarea id="negativePromptInput" placeholder="AI가 피했으면 하는 요소를 영어로, 쉼표로 구분해서 적어주세요">repeated motifs, dense ornament, crowded border, clusters, all-over pattern, wallpaper, filled border, oversized motif, photorealistic, photograph, 3D render, realistic texture, realistic lighting, muddy colors, dull colors, desaturated, gray haze, blotches, stains, smudges, blur, fuzzy edges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, person, face, crayon stick, art supplies, text, watermark</textarea>
   </div>
   <div class="option-status">negative prompt: 여기 적힌 건 "이런 건 넣지 마"라는 뜻으로 전달돼요. 긍정 프롬프트에 "no text"처럼 적는 것보다 여기 적는 게 훨씬 잘 먹혀요.</div>
   <div class="row" style="align-items:center;">
@@ -1156,7 +1156,7 @@
       ? basePrompt
       : `${requiredDoodleStyle}, ${basePrompt}`;
     const prompt = (isWholeStrip
-      ? `${guardedBasePrompt}, only five or six tiny isolated motifs across the entire strip, vast bare background`
+      ? `${guardedBasePrompt}, only one or two tiny isolated motifs across the entire strip, vast bare background`
       : `${guardedBasePrompt}, only one tiny isolated motif per frame cell, vast bare background`) + styleRefSuffix;
 
     // negativePrompt는 이제 negativePromptInput에서 직접 편집 가능. 비워두면

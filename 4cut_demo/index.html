@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>인생네컷 프로토타입</title>
+<style>
+  :root {
+    --pink: #ff8fab;
+    --pink-dark: #e56b8f;
+    --bg: #fdf2f6;
+    --ink: #33262a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 64px;
+  }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+  p.sub {
+    margin: 0 0 24px;
+    color: #7a6a70;
+    font-size: 14px;
+  }
+  .stage {
+    position: relative;
+    width: min(480px, 92vw);
+    aspect-ratio: 4 / 3;
+    background: #111;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  }
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1); /* 거울모드 */
+    display: block;
+  }
+  .countdown {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 96px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.15);
+  }
+  .flash {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .status {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    font-size: 12px;
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  button {
+    border: none;
+    border-radius: 999px;
+    padding: 12px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+  }
+  button:active { transform: scale(0.96); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--pink); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--pink-dark); }
+  .btn-secondary { background: #fff; color: var(--ink); border: 1px solid #e3d5da; }
+  .btn-secondary:hover:not(:disabled) { background: #f3e8ec; }
+
+  .thumbs {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .thumb {
+    width: 72px;
+    height: 54px;
+    border-radius: 8px;
+    background: #fff;
+    border: 2px dashed #e3c9d3;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #b78d9a;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+  .option-card {
+    margin-top: 20px;
+    width: min(480px, 92vw);
+    background: #fff;
+    border: 1px solid #f0dde4;
+    border-radius: 14px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .option-card h2 {
+    font-size: 14px;
+    margin: 0;
+  }
+  .option-card .row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .option-card input[type="text"],
+  .option-card input[type="password"],
+  .option-card textarea {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #e3d5da;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .option-card textarea {
+    min-height: 60px;
+    resize: vertical;
+  }
+  .radio-group {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+  }
+  .radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+  }
+  .option-status {
+    font-size: 12px;
+    color: #8a7580;
+    min-height: 16px;
+  }
+  .option-preview {
+    width: 100%;
+    max-width: 160px;
+    border-radius: 0;
+    display: none;
+    border: 0;
+  }
+  .style-ref-thumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #e3d5da;
+    display: none;
+  }
+
+  .result {
+    margin-top: 28px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+  }
+  .result canvas {
+    max-width: 260px;
+    border-radius: 0;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  }
+  .error {
+    margin-top: 16px;
+    color: #c0392b;
+    font-size: 13px;
+    max-width: 480px;
+    text-align: center;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<h1>📸 인생네컷 프로토타입</h1>
+<p class="sub">웹캠으로 4컷을 연속 촬영하고 스트립으로 합성합니다</p>
+
+<div class="stage" id="stage">
+  <video id="video" autoplay playsinline muted></video>
+  <div class="countdown" id="countdown"></div>
+  <div class="flash" id="flash"></div>
+  <div class="status" id="status">카메라 대기 중</div>
+</div>
+
+<div class="thumbs" id="thumbs">
+  <div class="thumb" data-slot="0">1</div>
+  <div class="thumb" data-slot="1">2</div>
+  <div class="thumb" data-slot="2">3</div>
+  <div class="thumb" data-slot="3">4</div>
+</div>
+
+<div class="controls">
+  <button class="btn-primary" id="startBtn">4컷 촬영 시작</button>
+  <button class="btn-secondary" id="retakeBtn" disabled>다시 찍기</button>
+</div>
+
+<div class="option-card">
+  <h2>🖼 프레임 스타일</h2>
+  <div class="radio-group">
+    <label><input type="radio" name="layout" value="strip" id="layoutStrip" checked /> 세로 스트립</label>
+    <label><input type="radio" name="layout" value="grid" id="layoutGrid" /> 2x2 그리드</label>
+  </div>
+  <div class="row">
+    <input type="text" id="titleInput" placeholder="제목 텍스트" value="인생네컷" />
+  </div>
+</div>
+
+<div class="option-card">
+  <h2>✨ AI 프레임 생성 (Cloudflare Workers AI)</h2>
+  <div class="row">
+    <textarea id="promptInput" placeholder="원하는 색과 분위기를 적어주세요. 예: 연한 라벤더와 하늘색, 밝고 포근한 느낌">flat 2D storybook illustration, childlike hand-drawn symbols with solid color fills, ultra-bright high-key pure white-ivory background, clean high-chroma palette, at least ninety percent bare and undecorated, dry wax-pastel texture contained inside each shape, a few small distinct stars and hearts, crisp sharply defined boundaries, plenty of empty space, saturated red, yellow, green, sky blue, pink and orange</textarea>
+  </div>
+  <div class="row">
+    <textarea id="negativePromptInput" placeholder="AI가 피했으면 하는 요소를 영어로, 쉼표로 구분해서 적어주세요">animal, character, mascot, repeated motifs, dense ornament, crowded border, clusters, all-over pattern, wallpaper, filled border, oversized motif, photorealistic, photograph, 3D render, realistic texture, realistic lighting, muddy colors, desaturated, gray haze, stains, smudges, blur, fuzzy edges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, person, face, crayon stick, art supplies, text, watermark</textarea>
+  </div>
+  <div class="option-status">negative prompt: 여기 적힌 건 "이런 건 넣지 마"라는 뜻으로 전달돼요. 긍정 프롬프트에 "no text"처럼 적는 것보다 여기 적는 게 훨씬 잘 먹혀요.</div>
+  <div class="row" style="align-items:center;">
+    <input type="file" id="styleRefInput" accept="image/*" style="flex:1;min-width:0;font-size:12px;" />
+    <img id="styleRefThumb" class="style-ref-thumb" alt="스타일 참고 이미지 미리보기" />
+    <button class="btn-secondary" id="clearStyleRefBtn" type="button" style="display:none;">참고 이미지 제거</button>
+  </div>
+  <div class="option-status" id="styleRefStatus">선택 사항: 색감·분위기를 따라 하고 싶은 참고 이미지를 올리면 그 톤에 맞춰 테두리를 생성해요.</div>
+  <div class="row">
+    <button class="btn-primary" id="genFrameBtn" style="flex:1">프레임 생성</button>
+    <button class="btn-secondary" id="clearFrameBtn">기본으로</button>
+  </div>
+  <div class="option-status" id="frameStatus">세로 모드에서는 사진 자리 4개가 뚫린 긴 1×4 프레임을 한 장으로 생성해요.</div>
+  <img class="option-preview" id="framePreview" alt="생성된 프레임 미리보기" />
+</div>
+
+<div class="error" id="error"></div>
+
+<div class="result" id="result">
+  <canvas id="stripCanvas"></canvas>
+  <div class="controls">
+    <button class="btn-primary" id="downloadBtn">다운로드</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  const video = document.getElementById('video');
+  const stage = document.getElementById('stage');
+  const countdownEl = document.getElementById('countdown');
+  const flashEl = document.getElementById('flash');
+  const statusEl = document.getElementById('status');
+  const startBtn = document.getElementById('startBtn');
+  const retakeBtn = document.getElementById('retakeBtn');
+  const thumbs = Array.from(document.querySelectorAll('.thumb'));
+  const errorEl = document.getElementById('error');
+  const resultEl = document.getElementById('result');
+  const stripCanvas = document.getElementById('stripCanvas');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const layoutStripRadio = document.getElementById('layoutStrip');
+  const layoutGridRadio = document.getElementById('layoutGrid');
+  const titleInput = document.getElementById('titleInput');
+  const promptInput = document.getElementById('promptInput');
+  const negativePromptInput = document.getElementById('negativePromptInput');
+  const styleRefInput = document.getElementById('styleRefInput');
+  const styleRefThumb = document.getElementById('styleRefThumb');
+  const clearStyleRefBtn = document.getElementById('clearStyleRefBtn');
+  const styleRefStatus = document.getElementById('styleRefStatus');
+  const genFrameBtn = document.getElementById('genFrameBtn');
+  const clearFrameBtn = document.getElementById('clearFrameBtn');
+  const frameStatus = document.getElementById('frameStatus');
+  const framePreview = document.getElementById('framePreview');
+
+  let stream = null;
+  let shots = []; // dataURL 4장
+  let frameImgs = []; // AI로 각각 인페인팅한 4개의 프레임 셀 이미지
+  let stripFrameImg = null; // 세로 1x4 전체를 한 번에 생성한 연속 프레임
+  let stripFrameRequestSize = null;
+  let frameLayout = 'strip'; // 'strip' | 'grid'
+  let styleRefImg = null; // 업로드한 스타일 참고 이미지(선택)
+
+  const DEFAULT_STYLE_REF_STATUS = '선택 사항: 색감·분위기를 따라 하고 싶은 참고 이미지를 올리면 그 톤에 맞춰 테두리를 생성해요.';
+  // CLIP 토큰 한계 안에서 실사·어두운 색·큰 무늬 금지를 우선 전달하도록 짧게 유지함.
+  // 손그림 질감은 positive prompt에서 직접 지정하므로 negative에서는 막지 않음.
+  const DEFAULT_NEGATIVE_BASE = 'photorealistic, photograph, photographic detail, realistic texture, realistic lighting, ' +
+    'material rendering, volumetric shading, 3D render, realistic scene, muddy colors, dull colors, desaturated, gray haze, ' +
+    'blotches, stains, smudges, blur, fuzzy edges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, ' +
+    'all-over pattern, wallpaper, filled border, repeated motifs, dense ornament, crowded border, clusters, oversized motif, ' +
+    'person, character, mascot, animal, face, crayon stick, pencil, marker, art supplies, text, watermark';
+
+  styleRefInput.addEventListener('change', async () => {
+    const file = styleRefInput.files && styleRefInput.files[0];
+    if (!file) return;
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    styleRefImg = await loadImage(dataUrl);
+    styleRefThumb.src = dataUrl;
+    styleRefThumb.style.display = 'inline-block';
+    clearStyleRefBtn.style.display = 'inline-block';
+    styleRefStatus.textContent = '참고 이미지 반영됨: 이 이미지의 색감·구도를 어느 정도 따라가며 테두리를 생성해요.';
+  });
+
+  clearStyleRefBtn.addEventListener('click', () => {
+    styleRefImg = null;
+    styleRefInput.value = '';
+    styleRefThumb.style.display = 'none';
+    clearStyleRefBtn.style.display = 'none';
+    styleRefStatus.textContent = DEFAULT_STYLE_REF_STATUS;
+  });
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.style.display = 'block';
+  }
+
+  async function initCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showError('이 브라우저는 카메라 접근(getUserMedia)을 지원하지 않습니다.');
+      startBtn.disabled = true;
+      return;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 960 }, facingMode: 'user' },
+        audio: false
+      });
+      video.srcObject = stream;
+      statusEl.textContent = '준비 완료';
+      startBtn.disabled = false;
+    } catch (err) {
+      let msg = '카메라를 불러오지 못했습니다: ' + err.message;
+      if (err.name === 'NotAllowedError') {
+        msg = '카메라 권한이 거부되었습니다. 브라우저 주소창 옆 카메라 아이콘에서 권한을 허용해주세요.';
+      } else if (err.name === 'NotFoundError') {
+        msg = '연결된 카메라를 찾을 수 없습니다.';
+      } else if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        msg = 'HTTPS 또는 localhost 환경에서만 카메라를 사용할 수 있습니다.';
+      }
+      showError(msg);
+      startBtn.disabled = true;
+    }
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function flash() {
+    flashEl.style.transition = 'none';
+    flashEl.style.opacity = '0.9';
+    requestAnimationFrame(() => {
+      flashEl.style.transition = 'opacity 0.4s ease';
+      flashEl.style.opacity = '0';
+    });
+  }
+
+  function captureFrame() {
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d');
+    // 미러링된 프리뷰와 동일하게 좌우 반전해서 저장
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', 0.92);
+  }
+
+  async function runCountdown(seconds) {
+    countdownEl.style.display = 'flex';
+    for (let i = seconds; i >= 1; i--) {
+      countdownEl.textContent = String(i);
+      await sleep(700);
+    }
+    countdownEl.style.display = 'none';
+  }
+
+  async function startSequence() {
+    startBtn.disabled = true;
+    retakeBtn.disabled = true;
+    shots = [];
+    thumbs.forEach((t, i) => {
+      t.innerHTML = String(i + 1);
+    });
+    resultEl.style.display = 'none';
+
+    for (let i = 0; i < 4; i++) {
+      statusEl.textContent = `${i + 1} / 4 촬영 준비`;
+      await runCountdown(3);
+      flash();
+      const dataUrl = captureFrame();
+      shots.push(dataUrl);
+      thumbs[i].innerHTML = '';
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      thumbs[i].appendChild(img);
+      await sleep(500);
+    }
+
+    statusEl.textContent = '촬영 완료';
+    await composeStrip();
+    startBtn.disabled = false;
+    retakeBtn.disabled = false;
+  }
+
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+
+  // --- 장식용 도형 헬퍼 ---
+  function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawHeart(ctx, cx, cy, size, color) {
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    const t = size * 0.3;
+    ctx.moveTo(cx, cy + t);
+    ctx.bezierCurveTo(cx, cy, cx - size / 2, cy, cx - size / 2, cy + t);
+    ctx.bezierCurveTo(cx - size / 2, cy + (size + t) / 2, cx, cy + (size + t) / 2, cx, cy + size);
+    ctx.bezierCurveTo(cx, cy + (size + t) / 2, cx + size / 2, cy + (size + t) / 2, cx + size / 2, cy + t);
+    ctx.bezierCurveTo(cx + size / 2, cy, cx, cy, cx, cy + t);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSparkle(ctx, cx, cy, size, color) {
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - size);
+    ctx.quadraticCurveTo(cx + size * 0.15, cy - size * 0.15, cx + size, cy);
+    ctx.quadraticCurveTo(cx + size * 0.15, cy + size * 0.15, cx, cy + size);
+    ctx.quadraticCurveTo(cx - size * 0.15, cy + size * 0.15, cx - size, cy);
+    ctx.quadraticCurveTo(cx - size * 0.15, cy - size * 0.15, cx, cy - size);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 사진 영역을 피해서 테두리 여백에만 반짝이를 뿌림
+  function drawSparkleField(ctx, W, H, pad) {
+    const spots = [
+      [pad * 0.5, pad * 0.55, 7, '#ffffff'],
+      [W - pad * 0.5, pad * 0.75, 5, '#ffffffcc'],
+      [pad * 0.42, H * 0.32, 6, '#ffffffcc'],
+      [W - pad * 0.4, H * 0.24, 8, '#ffffff'],
+      [pad * 0.48, H * 0.52, 5, '#ffffffaa'],
+      [W - pad * 0.45, H * 0.58, 6, '#ffffffcc'],
+      [pad * 0.4, H * 0.74, 7, '#ffffff'],
+      [W - pad * 0.42, H * 0.78, 5, '#ffffffaa']
+    ];
+    spots.forEach(([x, y, s, c]) => drawSparkle(ctx, x, y, s, c));
+  }
+
+  // 촬영 전에도 캔버스 크기를 미리 알아야 AI에게 "이 크기로 만들어줘"라고
+  // 요청할 수 있음. 예시 이미지(4컷 세로 스트립 템플릿)에서 한 컷의 비율을
+  // 눈대중으로 읽으면 가로:세로 ≈ 5:3(기존 4:3보다 더 납작한 가로형)이라
+  // 그 값으로 맞춤. drawPhotoCoverFit이 원본 웹캠 사진을 이 비율로 크롭해서
+  // 넣어주므로 캡처 로직은 안 건드려도 됨
+  const PHOTO_ASPECT = 3 / 5; // height / width (≈ 예시 이미지의 한 컷 비율 추정치)
+  const OUTPUT_SCALE = 2; // 다운로드용 캔버스는 2배 해상도로 렌더링
+
+  // 사진은 칸(chip) 전체를 꽉 채우지 않고, border만큼 안쪽으로 들어가서
+  // 확실히 작게 그려짐. 이러면 AI가 만든 프레임의 "빈 사각형" 위치가
+  // 우리가 계산한 것과 정확히 일치하지 않아도, 사진이 프레임을 덮어버리는
+  // 대신 넉넉한 여백 안에 자연스럽게 들어간 것처럼 보임
+  function getStripVerticalSize() {
+    const photoW = 300;
+    const photoH = Math.round(photoW * PHOTO_ASPECT);
+    const border = 60; // 사진 한 장을 감싸는 프레임 여백
+    // 마스크에서 "장식이 못 들어오는" 보호 구역을 사진보다 살짝 크게 잡는 여유값.
+    // 사진은 이 margin까지 포함한 크기로 그려서, 보호 구역 안에 흰 여백이
+    // 남지 않고 꽉 채워지게 함 (장식과는 안 겹치고, 흰 틈도 안 생김)
+    // 긴 1x4 프레임에서는 사진 보호 구역을 칸의 거의 끝까지 넓혀
+    // 사진 사이에 두꺼운 빈 띠가 생기지 않게 함. 실제 장식/구분선은
+    // 바깥쪽 8px + gap 영역에만 남음.
+    const margin = border - 8;
+    const chipW = photoW + border * 2;
+    const pad = 18;
+    const gap = 18;
+    // chipH에 gap을 아예 포함시킴. 그래서 AI 프레임 그림 자체는 chipH 크기로
+    // "여백까지 포함해서" 한 덩어리로 생성/타일링되고, 컷끼리는 이어 붙이듯
+    // 딱 붙여 그려서 그림 사이엔 이음새가 안 생김. 사진(마스크로 고정된 자리)은
+    // 여전히 border만큼 안쪽에서 시작하니, 결과적으로 사진과 사진 사이에만
+    // 여백(장식이 채워진 공간)이 생기고, 프레임 그림 자체는 하나로 이어짐
+    const chipH = photoH + border * 2 + gap;
+    const footerH = 120;
+    const W = chipW + pad * 2;
+    const H = pad + chipH * 4 + footerH;
+    return { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H };
+  }
+
+  function getStripGridSize() {
+    const photoW = 180;
+    const photoH = Math.round(photoW * PHOTO_ASPECT);
+    const border = 32;
+    const margin = Math.round(border * 0.35);
+    const chipW = photoW + border * 2;
+    const stripW = 24; // 세로 텍스트를 넣을 오른쪽 여백
+    // 참조 이미지처럼 바깥 여백과 컷 사이 여백을 같은 값으로 균일하게 둠
+    const outerPad = 14;
+    const colGap = 14;
+    const rowGap = 14;
+    // chipH에 rowGap을 포함시켜서 세로 방향(위/아래 컷)은 프레임 그림이
+    // 이어지고, 사진끼리만 여백이 생기게 함 (세로 스트립과 같은 원리)
+    const chipH = photoH + border * 2 + rowGap;
+    const footerH = 90;
+    const W = outerPad * 2 + (chipW + stripW) * 2 + colGap;
+    const H = outerPad * 2 + chipH * 2 + footerH;
+    return { photoW, photoH, border, margin, chipW, chipH, stripW, outerPad, colGap, rowGap, footerH, W, H };
+  }
+
+  // 요청한 크기(w,h)와 AI가 실제로 돌려준 이미지 크기(iw,ih)가 다를 수 있어서,
+  // 비율을 유지하며 목표 칸을 꽉 채우는 "cover" 변환(dx,dy,dw,dh)을 계산.
+  // drawFrameCover와 getPhotoRectInChip이 반드시 "같은" 변환을 써야
+  // 프레임 그림과 그 위에 얹는 사진 자리가 어긋나지 않음 (이전 버그의 원인이
+  // 바로 이 둘이 서로 다른 계산을 썼던 것)
+  function getFrameCoverTransform(img, x, y, w, h) {
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    if (!iw || !ih || !w || !h) {
+      return { dx: x, dy: y, dw: w, dh: h };
+    }
+    const ir = iw / ih;
+    const cr = w / h;
+    let dw, dh;
+    if (ir > cr) {
+      dh = h;
+      dw = h * ir;
+    } else {
+      dw = w;
+      dh = w / ir;
+    }
+    return { dx: x + (w - dw) / 2, dy: y + (h - dh) / 2, dw, dh };
+  }
+
+  function drawFrameCover(ctx, img, x, y, w, h, radius) {
+    const t = getFrameCoverTransform(img, x, y, w, h);
+    ctx.save();
+    // radius=0으로 그리면 칸끼리 맞닿았을 때 모서리가 둥글게 파여 보이는 이음새가
+    // 안 생겨서 4컷이 하나로 자연스럽게 이어짐
+    roundRectPath(ctx, x, y, w, h, radius == null ? 10 : radius);
+    ctx.clip();
+    ctx.fillStyle = '#f7ecf0';
+    ctx.fillRect(x, y, w, h);
+    ctx.drawImage(img, t.dx, t.dy, t.dw, t.dh);
+    ctx.restore();
+  }
+
+  function colorDistanceSq(a, b) {
+    const dr = a[0] - b[0];
+    const dg = a[1] - b[1];
+    const db = a[2] - b[2];
+    return dr * dr + dg * dg + db * db;
+  }
+
+  function getGeneratedContentBounds(img) {
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    const c = document.createElement('canvas');
+    c.width = iw;
+    c.height = ih;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, iw, ih).data;
+    const corners = [
+      [0, 0],
+      [iw - 1, 0],
+      [0, ih - 1],
+      [iw - 1, ih - 1]
+    ];
+    const bg = corners.reduce((acc, [x, y]) => {
+      const p = (y * iw + x) * 4;
+      acc[0] += data[p];
+      acc[1] += data[p + 1];
+      acc[2] += data[p + 2];
+      return acc;
+    }, [0, 0, 0]).map(v => v / corners.length);
+
+    const thresholdSq = 30 * 30;
+    let minX = iw, minY = ih, maxX = -1, maxY = -1;
+    for (let y = 0; y < ih; y++) {
+      for (let x = 0; x < iw; x++) {
+        const p = (y * iw + x) * 4;
+        const alpha = data[p + 3];
+        if (alpha < 16) continue;
+        if (colorDistanceSq([data[p], data[p + 1], data[p + 2]], bg) <= thresholdSq) continue;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+
+    if (maxX < minX || maxY < minY) {
+      return { x: 0, y: 0, w: iw, h: ih, trimmed: false };
+    }
+
+    const pad = Math.round(Math.min(iw, ih) * 0.02);
+    minX = Math.max(0, minX - pad);
+    minY = Math.max(0, minY - pad);
+    maxX = Math.min(iw - 1, maxX + pad);
+    maxY = Math.min(ih - 1, maxY + pad);
+
+    const bw = maxX - minX + 1;
+    const bh = maxY - minY + 1;
+    const trimsMeaningfully = bw < iw * 0.96 || bh < ih * 0.96;
+    const keepsEnoughImage = bw * bh > iw * ih * 0.35;
+    if (!trimsMeaningfully || !keepsEnoughImage) {
+      return { x: 0, y: 0, w: iw, h: ih, trimmed: false };
+    }
+    return { x: minX, y: minY, w: bw, h: bh, trimmed: true };
+  }
+
+  async function normalizeGeneratedFrameImage(img, chipW, chipH) {
+    const bounds = getGeneratedContentBounds(img);
+    const c = document.createElement('canvas');
+    c.width = chipW;
+    c.height = chipH;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#f7ecf0';
+    ctx.fillRect(0, 0, chipW, chipH);
+
+    const sourceRatio = bounds.w / bounds.h;
+    const targetRatio = chipW / chipH;
+    let sx = bounds.x, sy = bounds.y, sw = bounds.w, sh = bounds.h;
+    if (sourceRatio > targetRatio) {
+      sw = sh * targetRatio;
+      sx = bounds.x + (bounds.w - sw) / 2;
+    } else {
+      sh = sw / targetRatio;
+      sy = bounds.y + (bounds.h - sh) / 2;
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, chipW, chipH);
+
+    const normalized = await loadImage(c.toDataURL('image/png'));
+    normalized.wasTrimmed = bounds.trimmed;
+    normalized.normalizedDataUrl = c.toDataURL('image/png');
+    return normalized;
+  }
+
+  // 인페인팅용 "베이스 이미지 + 마스크"를 코드로 직접 그림.
+  // 마스크는 흰색 = AI가 다시 그려도 되는 영역(테두리), 검은색 = 절대 건드리지
+  // 말아야 할 영역(사진이 들어갈 자리)으로 약속되어 있음. 사진 자리는 border만큼
+  // 안쪽으로 들어간, 우리가 이미 알고 있는 정확한 좌표(photoW x photoH)로 박아
+  // 넣기 때문에 "빈 구역을 나중에 감지"할 필요 자체가 없어짐 — 위치가 100% 코드로 고정됨
+  function buildInpaintingAssets(chipW, chipH, border, photoW, photoH, margin, outputW = chipW, outputH = chipH, styleRefImg = null) {
+    const scaleX = outputW / chipW;
+    const scaleY = outputH / chipH;
+    const baseCanvas = document.createElement('canvas');
+    baseCanvas.width = outputW;
+    baseCanvas.height = outputH;
+    const bctx = baseCanvas.getContext('2d');
+    bctx.fillStyle = '#fff'; // 낮춘 strength에서 밝은 바탕색을 결과에 남기기 위한 베이스
+    bctx.fillRect(0, 0, outputW, outputH);
+    // 참고 이미지가 있으면 베이스 이미지 자체를 그 사진으로 채움. 인페인팅에서
+    // strength<1이면 흰 마스크(테두리) 영역이 이 베이스 픽셀에서 얼마나
+    // 벗어날지를 조절하므로, 여기 깔아둔 색/구도가 결과에 은은하게 남게 됨
+    // (검은 마스크=사진 자리는 strength와 무관하게 항상 그대로 보존됨)
+    if (styleRefImg) {
+      const t = getFrameCoverTransform(styleRefImg, 0, 0, outputW, outputH);
+      bctx.drawImage(styleRefImg, t.dx, t.dy, t.dw, t.dh);
+    }
+
+    // 마스크의 "건드리지 마" 영역(검정)을 실제 사진 크기보다 margin만큼 더 크게
+    // 잡음. 장식용 스크롤/덩굴 무늬가 물리적으로 절대 들어올 수 없는 빈 여백
+    // 링을 마스크 자체로 확보함. 사진도 이 확장된 크기 그대로 그릴 것이므로
+    // (getPhotoRectInChip 참고) 여백이 "흰 틈"으로 남지 않고 사진이 꽉 채움
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = outputW;
+    maskCanvas.height = outputH;
+    const mctx = maskCanvas.getContext('2d');
+    mctx.fillStyle = '#ffffff';
+    mctx.fillRect(0, 0, outputW, outputH);
+    mctx.fillStyle = '#000000';
+    mctx.fillRect(
+      Math.round((border - margin) * scaleX),
+      Math.round((border - margin) * scaleY),
+      Math.round((photoW + margin * 2) * scaleX),
+      Math.round((photoH + margin * 2) * scaleY)
+    );
+
+    return { baseCanvas, maskCanvas };
+  }
+
+  function buildStripInpaintingAssets(size, outputW, outputH, styleRefImg = null) {
+    const baseCanvas = document.createElement('canvas');
+    baseCanvas.width = outputW;
+    baseCanvas.height = outputH;
+    const bctx = baseCanvas.getContext('2d');
+    bctx.fillStyle = '#fff'; // 인페인팅 요청을 위한 중립 초기 이미지
+    bctx.fillRect(0, 0, outputW, outputH);
+    if (styleRefImg) {
+      const t = getFrameCoverTransform(styleRefImg, 0, 0, outputW, outputH);
+      bctx.drawImage(styleRefImg, t.dx, t.dy, t.dw, t.dh);
+    }
+
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = outputW;
+    maskCanvas.height = outputH;
+    const mctx = maskCanvas.getContext('2d');
+    mctx.fillStyle = '#ffffff';
+    mctx.fillRect(0, 0, outputW, outputH);
+    return { baseCanvas, maskCanvas };
+  }
+
+  function buildStripPreviewDataUrl(img, size) {
+    const { W, H, chipH, pad, border, margin, photoW, photoH } = size;
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    drawFrameCover(ctx, img, 0, 0, W, H, 0);
+    ctx.fillStyle = '#f7ecf0';
+    for (let i = 0; i < 4; i++) {
+      ctx.fillRect(
+        pad + border - margin,
+        pad + i * chipH + border - margin,
+        photoW + margin * 2,
+        photoH + margin * 2
+      );
+    }
+    return canvas.toDataURL('image/png');
+  }
+
+  function canvasToBase64Png(canvas) {
+    return canvas.toDataURL('image/png').split(',')[1];
+  }
+
+  function canvasToByteArray(canvas) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(async (blob) => {
+        if (!blob) { reject(new Error('마스크 이미지를 만들지 못했습니다.')); return; }
+        const buf = await blob.arrayBuffer();
+        resolve(Array.from(new Uint8Array(buf)));
+      }, 'image/png');
+    });
+  }
+
+  function getGeneratedImageIssue(img) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 32, 32);
+    ctx.drawImage(img, 0, 0, 32, 32);
+    const pixels = ctx.getImageData(0, 0, 32, 32).data;
+    let brightness = 0;
+    let edgeBrightness = 0;
+    let edgeCount = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      const value = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+      brightness += value;
+      const pixelIndex = i / 4;
+      const x = pixelIndex % 32;
+      const y = Math.floor(pixelIndex / 32);
+      if (x < 6 || x >= 26 || y < 4 || y >= 28) {
+        edgeBrightness += value;
+        edgeCount++;
+      }
+    }
+    const count = 32 * 32;
+    const mean = brightness / count;
+    const edgeMean = edgeBrightness / edgeCount;
+    if (mean < 45 || edgeMean < 55) return '결과가 지나치게 어두움';
+    return '';
+  }
+
+  // 모델이 유효한 무늬 위에 회색 필터를 씌운 듯 출력하는 경우, 검정 이미지
+  // 판정을 통과한 결과에만 밝은 아이보리 screen 보정을 적용한다.
+  async function removeDarkCast(img) {
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    const sample = document.createElement('canvas');
+    sample.width = 24;
+    sample.height = 24;
+    const sctx = sample.getContext('2d', { willReadFrequently: true });
+    sctx.drawImage(img, 0, 0, 24, 24);
+    const pixels = sctx.getImageData(0, 0, 24, 24).data;
+    let sum = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      sum += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+    }
+    const mean = sum / (24 * 24);
+    const canvas = document.createElement('canvas');
+    canvas.width = iw;
+    canvas.height = ih;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    if (mean < 190) {
+      const strength = Math.min(0.45, Math.max(0, (190 - mean) / (255 - mean)));
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = `rgba(255, 252, 245, ${strength})`;
+      ctx.fillRect(0, 0, iw, ih);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // screen 보정으로 옅어진 색을 다시 맑게 복원한다. 대비를 소폭 올려 작은
+    // 도형의 경계도 얼룩처럼 퍼지지 않고 분명하게 보이도록 함.
+    const enhanced = document.createElement('canvas');
+    enhanced.width = iw;
+    enhanced.height = ih;
+    const ectx = enhanced.getContext('2d');
+    ectx.filter = 'saturate(1.28) contrast(1.06)';
+    ectx.drawImage(canvas, 0, 0);
+    return loadImage(enhanced.toDataURL('image/png'));
+  }
+
+  // 사진을 목표 사각형 안에 늘리지 않고(비율 유지) 꽉 채워 그림 — 초과분은 크롭
+  function drawPhotoCoverFit(ctx, img, dx, dy, dw, dh, radius) {
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    const ir = iw / ih;
+    const tr = dw / dh;
+    let sx, sy, sw, sh;
+    if (ir > tr) {
+      sh = ih;
+      sw = ih * tr;
+      sx = (iw - sw) / 2;
+      sy = 0;
+    } else {
+      sw = iw;
+      sh = iw / tr;
+      sx = 0;
+      sy = (ih - sh) / 2;
+    }
+    ctx.save();
+    roundRectPath(ctx, dx, dy, dw, dh, radius ?? 8);
+    ctx.clip();
+    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+    ctx.restore();
+  }
+
+  // 사진을 그릴 자리는 마스크로 이미 정확히 박아넣은 좌표(제출한 chipW x chipH
+  // 캔버스 기준, border-margin, border-margin, photoW+margin*2, photoH+margin*2
+  // = 마스크의 보호 구역과 정확히 같은 크기)이므로 감지는 필요 없음. 사진을
+  // 보호 구역 전체(여백 포함) 크기로 그려야 "장식은 안 겹치고, 흰 여백도 안
+  // 남는" 상태가 됨. 좌표를 화면에 그릴 땐 반드시 drawFrameCover가 쓴 것과
+  // "같은" cover 변환을 통과시켜야 함 — 그래야 AI가 다른 크기의 이미지를
+  // 돌려줘도 프레임 그림과 사진 자리가 항상 정확히 겹침
+  function getPhotoRectInChip(chipX, chipY, chipW, chipH, border, photoW, photoH, margin, activeFrame) {
+    const boxLeft = border - margin;
+    const boxTop = border - margin;
+    const boxW0 = photoW + margin * 2;
+    const boxH0 = photoH + margin * 2;
+    if (activeFrame) {
+      const t = getFrameCoverTransform(activeFrame, chipX, chipY, chipW, chipH);
+      const boxX = t.dx + (boxLeft / chipW) * t.dw;
+      const boxY = t.dy + (boxTop / chipH) * t.dh;
+      const boxW = (boxW0 / chipW) * t.dw;
+      const boxH = (boxH0 / chipH) * t.dh;
+      // 마스크 경계의 블렌딩을 덮기 위해 아주 살짝(2%)만 더 확대
+      const outset = 1.02;
+      const cx = boxX + boxW / 2, cy = boxY + boxH / 2;
+      const w = boxW * outset, h = boxH * outset;
+      return { x: cx - w / 2, y: cy - h / 2, w, h };
+    }
+    return { x: chipX + boxLeft, y: chipY + boxTop, w: boxW0, h: boxH0 };
+  }
+
+  function getPhotoRectInStrip(index, size) {
+    const { W, H, footerH, chipH, pad, border, margin, photoW, photoH } = size;
+    const frameH = H;
+    const sourceW = stripFrameRequestSize.width;
+    const sourceH = stripFrameRequestSize.height;
+    const scaleX = sourceW / W;
+    const scaleY = sourceH / frameH;
+    const boxX = (pad + border - margin) * scaleX;
+    const boxY = (pad + index * chipH + border - margin) * scaleY;
+    const boxW = (photoW + margin * 2) * scaleX;
+    const boxH = (photoH + margin * 2) * scaleY;
+    const t = getFrameCoverTransform(stripFrameImg, 0, 0, W, frameH);
+    const x = t.dx + (boxX / sourceW) * t.dw;
+    const y = t.dy + (boxY / sourceH) * t.dh;
+    const w = (boxW / sourceW) * t.dw;
+    const h = (boxH / sourceH) * t.dh;
+    const outset = 1.02;
+    return {
+      x: x - w * (outset - 1) / 2,
+      y: y - h * (outset - 1) / 2,
+      w: w * outset,
+      h: h * outset
+    };
+  }
+
+  function drawStripSeparator(ctx, centerY, height, W, frameH) {
+    const iw = stripFrameImg.naturalWidth || stripFrameImg.width;
+    const ih = stripFrameImg.naturalHeight || stripFrameImg.height;
+    const t = getFrameCoverTransform(stripFrameImg, 0, 0, W, frameH);
+    const sx = Math.max(0, ((0 - t.dx) / t.dw) * iw);
+    const sy = Math.max(0, ((centerY - height / 2 - t.dy) / t.dh) * ih);
+    const sw = Math.min(iw - sx, (W / t.dw) * iw);
+    const sh = Math.max(1, Math.min(ih - sy, (height / t.dh) * ih));
+    const y = centerY - height / 2;
+
+    // 원래 긴 프레임의 해당 위치를 다시 사용해 가로 막대 전체를 프레임으로 채움.
+    ctx.drawImage(stripFrameImg, sx, sy, sw, sh, 0, y, W, height);
+  }
+
+  async function composeStrip() {
+    const images = await Promise.all(shots.map(loadImage));
+    if (frameLayout === 'grid') {
+      composeStripGrid(images);
+    } else {
+      composeStripVertical(images);
+    }
+    resultEl.style.display = 'flex';
+  }
+
+  function composeStripVertical(images) {
+    const { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H } = getStripVerticalSize();
+    const hasFrame = !!stripFrameImg && !!stripFrameRequestSize;
+
+    stripCanvas.width = W * OUTPUT_SCALE;
+    stripCanvas.height = H * OUTPUT_SCALE;
+    const ctx = stripCanvas.getContext('2d');
+    ctx.setTransform(OUTPUT_SCALE, 0, 0, OUTPUT_SCALE, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // 컷 사이 여백(gap)이 투명하게 남지 않고 항상 흰색으로 채워지도록 먼저 깔아둠
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+
+    if (!hasFrame) {
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#ffd6e8');
+      grad.addColorStop(1, '#ff8fab');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+      drawSparkleField(ctx, W, H, pad);
+    } else {
+      drawFrameCover(ctx, stripFrameImg, 0, 0, W, H, 0);
+    }
+
+    // 사진 4장은 항상 정확히 같은 위치(칸)에 그림. 프레임은 chipH(여백 포함) 단위로
+    // 서로 딱 붙여 그려서 하나로 이어지고, 그 위에 마스크로 고정된 자리에 맞춰
+    // 사진을 프레임보다 확실히 작게 삽입함 — 결과적으로 사진끼리만 떨어져 보임
+    images.forEach((img, i) => {
+      const chipY = pad + i * chipH;
+      const chipX = pad;
+
+      if (!hasFrame) {
+        // AI 프레임이 없을 때도 사진 칸 표시를 위해 살짝 큰 흰 테두리를 깔아줌
+        ctx.fillStyle = '#fff';
+        roundRectPath(ctx, chipX + border - 6, chipY + border - 6, photoW + 12, photoH + 12, 0);
+        ctx.fill();
+      }
+
+      const r = hasFrame
+        ? getPhotoRectInStrip(i, { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H })
+        : getPhotoRectInChip(chipX, chipY, chipW, chipH, border, photoW, photoH, margin, null);
+      drawPhotoCoverFit(ctx, img, r.x, r.y, r.w, r.h, 0);
+    });
+
+    if (hasFrame) {
+      // 네 사진 칸이 하나로 이어져 보이지 않도록, 각 칸 사이를 프레임 재질의
+      // 가로 막대로 다시 덮어 표처럼 분명한 4개의 직사각형을 만듦.
+      for (let i = 0; i < 3; i++) {
+        const current = getPhotoRectInStrip(i, { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H });
+        const next = getPhotoRectInStrip(i + 1, { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H });
+        const gapTop = current.y + current.h;
+        const gapBottom = next.y;
+        const separatorH = Math.max(12, gapBottom - gapTop);
+        drawStripSeparator(ctx, (gapTop + gapBottom) / 2, separatorH, W, H);
+      }
+    }
+
+    // 하단 라벨: 하트 + 제목 + 날짜
+    const footerY = H - footerH;
+    if (!hasFrame) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      roundRectPath(ctx, pad * 0.5, footerY + 10, W - pad, footerH - 26, 16);
+      ctx.fill();
+    }
+
+    ctx.textAlign = 'center';
+    [-30, 0, 30].forEach((dx) => drawHeart(ctx, W / 2 + dx, footerY + 40, 9, hasFrame ? '#ffffff' : '#ff5f96'));
+
+    ctx.save();
+    if (hasFrame) {
+      ctx.shadowColor = 'rgba(0,0,0,0.55)';
+      ctx.shadowBlur = 5;
+    }
+    ctx.fillStyle = hasFrame ? '#ffffff' : '#ff5f96';
+    ctx.font = 'bold 28px sans-serif';
+    const title = titleInput.value.trim() || '인생네컷';
+    ctx.fillText(title, W / 2, footerY + 76);
+
+    ctx.fillStyle = hasFrame ? '#ffffff' : '#a97b8c';
+    ctx.font = '14px sans-serif';
+    const dateStr = new Date().toLocaleDateString('ko-KR');
+    ctx.fillText(dateStr, W / 2, footerY + 98);
+    ctx.restore();
+  }
+
+  function composeStripGrid(images) {
+    const { photoW, photoH, border, margin, chipW, chipH, stripW, outerPad, colGap, rowGap, footerH, W, H } = getStripGridSize();
+    const hasFrame = frameImgs.length === 4;
+
+    stripCanvas.width = W * OUTPUT_SCALE;
+    stripCanvas.height = H * OUTPUT_SCALE;
+    const ctx = stripCanvas.getContext('2d');
+    ctx.setTransform(OUTPUT_SCALE, 0, 0, OUTPUT_SCALE, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    ctx.fillStyle = hasFrame ? '#fdf2f6' : '#111';
+    ctx.fillRect(0, 0, W, H);
+
+    for (let i = 0; i < 4; i++) {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = outerPad + col * (chipW + stripW + colGap);
+      const y = outerPad + row * chipH;
+      const activeFrame = frameImgs[i];
+
+      if (hasFrame) {
+        drawFrameCover(ctx, activeFrame, x, y, chipW, chipH, 0);
+      } else {
+        ctx.fillStyle = '#fff';
+        roundRectPath(ctx, x + border - 6, y + border - 6, photoW + 12, photoH + 12, 0);
+        ctx.fill();
+      }
+
+      const r = getPhotoRectInChip(x, y, chipW, chipH, border, photoW, photoH, margin, activeFrame);
+      drawPhotoCoverFit(ctx, images[i], r.x, r.y, r.w, r.h, 0);
+
+      // 오른쪽 세로 텍스트 (번호 + 장식 문구)
+      ctx.save();
+      ctx.translate(x + chipW + stripW / 2, y + chipH / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillStyle = hasFrame ? '#7a5c66' : '#fff';
+      ctx.textAlign = 'center';
+      ctx.font = '11px sans-serif';
+      const num = String(Math.floor(Math.random() * 90 + 10));
+      ctx.fillText(`${num}   ▾   TAKE YOUR MEMORY`, 0, 4);
+      ctx.restore();
+    }
+
+    ctx.fillStyle = hasFrame ? '#ff5f96' : '#fff';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 20px sans-serif';
+    const title = (titleInput.value.trim() || '인생네컷').toUpperCase();
+    ctx.fillText(title, W / 2, H - footerH / 2 + 6);
+  }
+
+  async function generateFrame() {
+    const basePrompt = promptInput.value.trim();
+    if (!basePrompt) {
+      frameStatus.textContent = '프롬프트를 입력해주세요.';
+      return;
+    }
+    genFrameBtn.disabled = true;
+    framePreview.style.display = 'none';
+    const isWholeStrip = frameLayout === 'strip';
+    frameStatus.textContent = isWholeStrip
+      ? '1×4 세로 프레임 전체를 준비하고 있어요...'
+      : '서로 다른 프레임 4개를 준비하고 있어요...';
+
+    // 세로 모드는 사진 자리 네 개를 하나의 긴 마스크로 고정해 연속된 1x4 프레임을
+    // 만들고, 그리드 모드는 셀 네 개를 각각 만들어 2x2로 배치함.
+    const size = frameLayout === 'grid' ? getStripGridSize() : getStripVerticalSize();
+    const { chipW, chipH, border, photoW, photoH, margin } = size;
+    const frameH = isWholeStrip ? size.H : chipH;
+    // 긴 원본 비율은 유지하되 생성 해상도를 낮춰 Beta 인페인팅 모델의
+    // 검은 출력과 긴 처리 시간을 줄임. 320은 너무 낮아서 뚜렷한 벡터 도형 대신
+    // 뭉개진 그레인/마블 텍스처로 수렴하는 경향이 있어 448로 올려 작은 선이
+    // 큰 덩어리로 합쳐지는 현상도 줄임.
+    const requestW = isWholeStrip ? 448 : Math.ceil(chipW / 8) * 8;
+    const requestH = isWholeStrip
+      ? Math.ceil((requestW * frameH / size.W) / 8) * 8
+      : Math.ceil(frameH / 8) * 8;
+
+    // 인페인팅 방식: 사진 자리를 "프롬프트로 부탁"하는 게 아니라 마스크로 직접
+    // 박아넣음. 검은색(마스크) = 사진 자리(+여백 margin), 절대 안 건드림 /
+    // 흰색(마스크) = 테두리, AI가 자유롭게 꾸밈. 그래서 프롬프트에는 크기·위치
+    // 얘기를 할 필요가 없고, "테두리만 꾸며줘"라고만 하면 됨 — 위치·크기는
+    // 100% 코드가 결정
+    const { baseCanvas, maskCanvas } = isWholeStrip
+      ? buildStripInpaintingAssets(size, requestW, requestH, styleRefImg)
+      : buildInpaintingAssets(chipW, chipH, border, photoW, photoH, margin, requestW, requestH, styleRefImg);
+    const imageB64 = canvasToBase64Png(baseCanvas);
+    const maskBytes = await canvasToByteArray(maskCanvas);
+
+    // SD1.5의 CLIP 텍스트 인코더는 77토큰에서 그냥 잘림(청킹 없음). 예전 버전은
+    // basePrompt 뒤에 100단어 가까운 부가 설명을 더 붙여서 뒷부분(안쪽 경계
+    // 침범 금지 같은 핵심 지시)이 실제로는 인코더에 보이지도 않았을 가능성이
+    // 높았음. 그래서 지금은: (1) 문장을 짧게, (2) 구조적으로 중요한 지시를
+    // 앞쪽에, (3) 긍정 프롬프트에 "no X" 형태의 부정문을 넣지 않음(CLIP이
+    // 부정어를 제대로 처리하지 못해서 오히려 그 단어의 등장 확률만 올릴 수
+    // 있음 — 대신 negativePrompt에만 명시) 원칙으로 재작성함.
+    // 참고 이미지가 있으면 베이스 캔버스가 이미 그 이미지로 채워져 있고
+    // (buildInpaintingAssets/buildStripInpaintingAssets) strength도 아래에서
+    // 낮춰서 그 픽셀이 결과에 남게 함. 프롬프트에는 짧은 문구만 덧붙여 같은
+    // 방향(참고 이미지의 색/구도 유지)을 강화함
+    // 단색으로 수렴하지 않도록 여러 밝은 파스텔 색과 작은 손그림 요소를 적당히
+    // 반복하되, 사진을 방해하지 않을 만큼의 여백은 유지함.
+    const styleRefSuffix = styleRefImg ? ', matching the reference image colors and composition' : '';
+    const requiredDoodleStyle = 'flat 2D storybook illustration, childlike hand-drawn symbols, solid color fills';
+    const guardedBasePrompt = /storybook illustration|hand-drawn symbols|flat 2D/i.test(basePrompt)
+      ? basePrompt
+      : `${requiredDoodleStyle}, ${basePrompt}`;
+    const prompt = (isWholeStrip
+      ? `${guardedBasePrompt}, only one or two tiny isolated motifs across the entire strip, vast bare background`
+      : `${guardedBasePrompt}, only one tiny isolated motif per frame cell, vast bare background`) + styleRefSuffix;
+
+    // negativePrompt는 이제 negativePromptInput에서 직접 편집 가능. 비워두면
+    // 안전한 기본값(DEFAULT_NEGATIVE_BASE)으로 되돌아감. 모드별 구조적 금지
+    // 사항(사진 자리 침범 등)은 사용자가 안 건드리게 항상 코드로 뒤에 붙임
+    const negativeBase = negativePromptInput.value.trim() || DEFAULT_NEGATIVE_BASE;
+    const requiredNoToolNegative = 'crayon stick, crayon object, pencil, marker, drawing tool, art supplies';
+    const guardedToolNegative = /crayon stick|crayon object|drawing tool|art supplies/i.test(negativeBase)
+      ? negativeBase
+      : `${requiredNoToolNegative}, ${negativeBase}`;
+    const requiredNonPhotoNegative = 'photorealistic, photography, photograph, realistic scene, camera image, stock photo, portrait, person, face, body, realistic lighting, 3D render';
+    const guardedNegativeBase = /photorealistic|photography|photograph/i.test(guardedToolNegative)
+      ? guardedToolNegative
+      : `${requiredNonPhotoNegative}, ${guardedToolNegative}`;
+    const negativePrompt = isWholeStrip
+      ? `${guardedNegativeBase}, empty canvas, rectangular openings, grid lines`
+      : `${guardedNegativeBase}, border overlapping the center, decorations crossing the inner edge, busy pattern near the center`;
+
+    const compositionVariations = isWholeStrip ? [
+      'mostly plain border with isolated doodles'
+    ] : [
+      'top and upper corners emphasized',
+      'asymmetric side-focused arrangement',
+      'balanced corner accents',
+      'bottom and lower corners emphasized'
+    ];
+
+    // 그리드 모드는 4칸을 각각 따로 생성하는데, 매번 완전 랜덤 seed를 쓰면
+    // 같은 basePrompt를 줘도 칸마다 색감/톤이 미묘하게 어긋날 수 있음. 세션당
+    // 공통 seed를 베이스로 잡고 칸마다 작은 오프셋만 주면 같은 팔레트를
+    // 공유하면서 compositionVariations로만 구도 차이가 남. 검은 이미지가 나와
+    // 재시도할 때는 같은 seed를 또 쓰면 또 실패할 수 있어 attempt마다는 계속
+    // 바꿔줌.
+    const sessionSeed = Math.floor(Math.random() * 2000000000);
+    // 기본 생성은 베이스 색을 보존하지 않고 사용자가 프롬프트에 입력한 색을 따름.
+    // 참고 이미지가 있을 때만 해당 이미지의 색과 구도를 보존함.
+    // (검은 마스크=사진 자리는 strength와 무관하게 항상 원본 그대로 보존됨)
+    const genStrength = styleRefImg ? 0.55 : 1;
+    try {
+      const generatedFrames = [];
+      for (let i = 0; i < compositionVariations.length; i++) {
+        const maxAttempts = 3;
+        let acceptedFrame = null;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          frameStatus.textContent = isWholeStrip
+            ? `1×4 세로 프레임 생성 중... (${attempt}/${maxAttempts})`
+            : `서로 다른 프레임 생성 중... (${i + 1}/4)`;
+
+          const res = await fetch('/api/generate-frame', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: `${prompt}, ${compositionVariations[i]}`,
+              negativePrompt,
+              width: requestW, height: requestH,
+              image: imageB64, mask: maskBytes,
+              seed: (sessionSeed + i * 97 + (attempt - 1) * 7919) % 2147483647,
+              strength: genStrength,
+              // guidance를 낮게 유지하면 "bright/sparse/white background" 같은
+              // 텍스트 지시를 붙잡는 힘도 약해져서 어둡고 밀도 높은 결과로
+              // 흐르는 경향이 있었음. negativePrompt가 이제 오버새추레이션/네온/
+              // 뭉침/텍스처까지 충분히 방어하고 있어서, 원래 기본값(7.5)까지
+              // 밝기는 유지하면서 캔디톤처럼 과하게 선명해지지 않도록 8.0으로 조절
+              guidance: 8.0
+            })
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            const detail = data.detail ? ` (${JSON.stringify(data.detail)})` : '';
+            throw new Error((isWholeStrip ? '1×4 프레임: ' : `${i + 1}번째 프레임: `) + (data.error || `HTTP ${res.status}`) + detail);
+          }
+          if (!data.image) {
+            throw new Error(`${i + 1}번째 프레임 응답에서 이미지 데이터를 찾지 못했습니다.`);
+          }
+
+          const mime = data.mime || 'image/jpeg';
+          const dataUrl = `data:${mime};base64,${data.image}`;
+          let rawFrameImg = await loadImage(dataUrl);
+          const imageIssue = getGeneratedImageIssue(rawFrameImg);
+          if (imageIssue) {
+            frameStatus.textContent = `${imageIssue}: 다른 설정으로 다시 생성하고 있어요...`;
+            continue;
+          }
+          rawFrameImg = await removeDarkCast(rawFrameImg);
+          rawFrameImg.dataUrl = rawFrameImg.src;
+          acceptedFrame = isWholeStrip
+            ? rawFrameImg
+            : await normalizeGeneratedFrameImage(rawFrameImg, chipW, chipH);
+          break;
+        }
+        if (!acceptedFrame) {
+          throw new Error('3번 시도했지만 지나치게 어두운 이미지만 반환됐습니다. 잠시 후 다시 시도해주세요.');
+        }
+        generatedFrames.push(acceptedFrame);
+      }
+
+      if (isWholeStrip) {
+        stripFrameImg = generatedFrames[0];
+        stripFrameRequestSize = { width: requestW, height: requestH };
+        frameImgs = [];
+        framePreview.src = buildStripPreviewDataUrl(stripFrameImg, size);
+      } else {
+        frameImgs = generatedFrames;
+        stripFrameImg = null;
+        stripFrameRequestSize = null;
+        framePreview.src = frameImgs[0].normalizedDataUrl;
+      }
+      framePreview.style.display = 'block';
+      frameStatus.textContent = isWholeStrip
+        ? '연결된 1×4 세로 프레임 생성 완료! 네 사진 자리를 하나의 긴 디자인이 감싸요.'
+        : '서로 다른 프레임 4개 생성 완료! 같은 테마 안에서 컷마다 장식 구도를 다르게 만들었어요.';
+
+      if (shots.length === 4) {
+        await composeStrip();
+      }
+    } catch (err) {
+      frameStatus.textContent = '생성 실패: ' + err.message;
+    } finally {
+      genFrameBtn.disabled = false;
+    }
+  }
+
+  function clearFrame() {
+    frameImgs = [];
+    stripFrameImg = null;
+    stripFrameRequestSize = null;
+    framePreview.style.display = 'none';
+    frameStatus.textContent = '기본 디자인으로 돌아갔어요.';
+    if (shots.length === 4) {
+      composeStrip();
+    }
+  }
+
+  downloadBtn.addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.download = `life4cut_${Date.now()}.png`;
+    link.href = stripCanvas.toDataURL('image/png');
+    link.click();
+  });
+
+  startBtn.addEventListener('click', startSequence);
+  retakeBtn.addEventListener('click', startSequence);
+
+  layoutStripRadio.addEventListener('change', () => {
+    frameLayout = 'strip';
+    if (shots.length === 4) composeStrip();
+  });
+  layoutGridRadio.addEventListener('change', () => {
+    frameLayout = 'grid';
+    if (shots.length === 4) composeStrip();
+  });
+  titleInput.addEventListener('input', () => {
+    if (shots.length === 4) composeStrip();
+  });
+  genFrameBtn.addEventListener('click', generateFrame);
+  clearFrameBtn.addEventListener('click', clearFrame);
+
+  initCamera();
+})();
+</script>
+
+</body>
+</html>

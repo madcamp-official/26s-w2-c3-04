@@ -247,6 +247,24 @@
   </div>
 
   <div class="status-bar" id="statusBar">
+    <div class="row" style="justify-content:center; margin-bottom:10px;">
+      <select id="testGestureSelect" aria-label="테스트할 포즈 선택" style="max-width:220px;">
+        <option value="">테스트할 포즈 선택</option>
+        <option value="v">브이 ✌️</option>
+        <option value="thumbsup">엄지척 👍</option>
+        <option value="tigerclaw">어흥 🐯</option>
+        <option value="catears">고양이 귀 🐱</option>
+        <option value="cheekheart">볼하트 💕</option>
+        <option value="bigheart">양손하트 🫶</option>
+        <option value="flower">꽃받침 🌸</option>
+        <option value="mouthpose">숭이포즈 ☝️</option>
+        <option value="yahoo">야호포즈 🙌</option>
+        <option value="palmpose">놀라는 포즈 🖐️</option>
+        <option value="rocknroll">락앤롤 포즈 🤟</option>
+      </select>
+      <button type="button" id="applyTestGestureBtn">선택 포즈만 테스트</button>
+      <button type="button" class="btn-secondary" id="randomGestureModeBtn">일반 모드</button>
+    </div>
     <div class="progress" id="progressText">준비 중...</div>
     <div class="gesture-name" id="gestureName">-</div>
     <div class="guide-caption" id="guideCaption"></div>
@@ -363,17 +381,32 @@ function shuffle(arr) {
   }
   return a;
 }
-const chosenGestures = shuffle(GESTURES).slice(0, 4);
+const testGestureId = new URLSearchParams(window.location.search).get('testGesture');
+const testGesture = GESTURES.find(g => g.id === testGestureId) || null;
+const isGestureTestMode = testGesture !== null;
+const chosenGestures = isGestureTestMode ? [testGesture] : shuffle(GESTURES).slice(0, 4);
 
-// 각 제스처를 2번씩 = 총 8장
+// 일반 모드는 각 제스처를 2번씩, 테스트 모드는 선택한 한 제스처를 8번 반복한다.
 const sequence = [];
-chosenGestures.forEach(g => {
-  sequence.push({ ...g, round: 1 });
-  sequence.push({ ...g, round: 2 });
-});
+if (isGestureTestMode) {
+  for (let round = 1; round <= 8; round++) {
+    sequence.push({ ...testGesture, round });
+  }
+} else {
+  chosenGestures.forEach(g => {
+    sequence.push({ ...g, round: 1 });
+    sequence.push({ ...g, round: 2 });
+  });
+}
 
 const COUNTDOWN_MS = 3000;
 const RESET_GAP_MS = 1200;         // 촬영 후 다음 동작 준비 텀
+const DETECTION_WINDOW_SIZE = 10;  // 최근 10프레임의 판정 결과를 사용
+const DETECTION_REQUIRED_HITS = 8; // 10프레임 중 8프레임 이상 성공하면 인정
+// 야호(손끝 추정 불안정)와 양손 결합 포즈(여러 손 중 하나가 자주 깜빡여
+// 프레임 단위 실패가 잦음)는 6프레임 성공으로 완화해서 인정한다.
+const RELAXED_DETECTION_REQUIRED_HITS = 6;
+const FAILURE_GRACE_MS = 400;      // 순간적인 인식 실패는 400ms까지 허용
 
 // ---------- 상태 ----------
 let handLandmarker = null;
@@ -383,6 +416,8 @@ let octx = overlay.getContext('2d');
 
 let currentIdx = 0;
 let countdownStartTs = null;
+let detectionHistory = [];
+let detectionFailureStartTs = null;
 let inResetGap = false;
 let capturedPhotos = []; // { dataUrl, gestureName }
 let lastVideoTime = -1;
@@ -394,6 +429,23 @@ const progressTextEl = document.getElementById('progressText');
 const countdownNumEl = document.getElementById('countdownNum');
 const logArea = document.getElementById('logArea');
 const errorBox = document.getElementById('errorBox');
+const testGestureSelect = document.getElementById('testGestureSelect');
+
+testGestureSelect.value = testGesture ? testGesture.id : '';
+document.getElementById('applyTestGestureBtn').addEventListener('click', () => {
+  if (!testGestureSelect.value) {
+    subStatusEl.textContent = '먼저 테스트할 포즈를 선택해주세요';
+    return;
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set('testGesture', testGestureSelect.value);
+  window.location.href = url.toString();
+});
+document.getElementById('randomGestureModeBtn').addEventListener('click', () => {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('testGesture');
+  window.location.href = url.toString();
+});
 
 // 동작별 설명 문구 (일러스트 없이 텍스트로만 안내)
 const GUIDE_CAPTION = {
@@ -403,9 +455,9 @@ const GUIDE_CAPTION = {
   catears: '손목을 머리 위로 들고 손등이 보이게, 검지·중지를 벌려 손톱이 머리에 닿도록 굽히기 (한 손 OK)',
   cheekheart: '엄지는 아래로, 나머지 네 손가락은 살짝 구부려 반원 모양으로 볼(입 높이 또는 그 위)에 대기 (한 손 OK)',
   bigheart: '양손을 둥글게 구부려 검지 끝은 위에서, 엄지 끝은 아래에서 맞닿게 하트 만들기',
-  flower: '손가락을 붙여 펴고 턱 밑에 대기 (한 손 OK)',
+  flower: '손가락을 붙여 편 손으로 턱 밑을 컵처럼 받치기 (한 손 OK, 양손도 가능)',
   mouthpose: '검지손가락을 입꼬리 끝에 대기 (살짝 깨무는 느낌도 OK)',
-  yahoo: '브이를 뒤집어서 손톱이 바닥을 향하게',
+  yahoo: '손을 얼굴과 비슷한 거리에 두고, 브이를 뒤집어 손톱이 바닥을 향하게',
   palmpose: '손등이 보이게, 손가락을 사이사이 틈이 보이도록 쫙 펼치기 (한 손 OK)',
   rocknroll: '엄지·검지·새끼손가락은 펴고, 중지·약지는 완전히 접기',
 };
@@ -440,7 +492,9 @@ async function init() {
       delegate: "GPU"
     },
     runningMode: "VIDEO",
-    numHands: 8   // 여럿이 함께 찍을 때 대비 (최대 4명 x 양손)
+    // 4명 x 양손 = 8이 필요한데 딱 8로 두면 아홉 번째 손(구경꾼, 프레임에
+    // 걸친 손)이 들어올 때 기존 손이 밀려 짝/개수 판정이 깨진다. 여유분 포함 12.
+    numHands: 12
   });
 
   log('모델 로드 완료, 인식 시작');
@@ -499,6 +553,24 @@ function isBackOfHandFacing(lm, handednessLabel) {
   return backFacing;
 }
 
+// 손바닥이 카메라를 향하는 "정도"(-1~1 근사). isBackOfHandFacing과 같은 외적
+// 원리지만, 부호만 보는 대신 두 벡터 길이로 정규화한 크기를 반환한다:
+// 손바닥 정면 = 큰 양수, 손을 옆으로 세움 = 0 근처, 손등 = 음수.
+// 부호 규약은 isBackOfHandFacing(FLIP 반영)과 일치시킴.
+function palmFacingScore(lm, handednessLabel) {
+  const wrist = lm[0], idx = lm[5], pinky = lm[17];
+  const v1x = idx.x - wrist.x, v1y = idx.y - wrist.y;
+  const v2x = pinky.x - wrist.x, v2y = pinky.y - wrist.y;
+  const crossZ = v1x * v2y - v1y * v2x;
+  const norm = (Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y)) || 1;
+  let palmScore = (handednessLabel === 'Right' ? -crossZ : crossZ) / norm;
+  if (!FLIP_HAND_ORIENTATION) palmScore = -palmScore;
+  return palmScore;
+}
+// 어흥에서 요구하는 최소 "손바닥 정면" 점수. 손바닥을 카메라로 향하면 0.4~0.6쯤
+// 나오고, 옆으로 돌리면 0 근처로 떨어진다. 낮추면 관대해지고 높이면 엄격해짐.
+const TIGER_PALM_FACING_MIN = 0.25;
+
 function vComponent(lm) {
   const indexExt = isFingerExtended(lm, 8, 6);
   const middleExt = isFingerExtended(lm, 12, 10);
@@ -507,24 +579,87 @@ function vComponent(lm) {
   return indexExt && middleExt && ringCurl && pinkyCurl;
 }
 
+// 3D 관절 각도: fingerBendAngle의 z 포함 버전. 손이 카메라 쪽으로 기울어
+// 화면(x,y)에서 손가락이 원근 압축돼도, 깊이(z) 성분이 살아 있어 굽힘 판정이
+// 흔들리지 않는다. z는 MediaPipe가 주는 손목 기준 상대 깊이(x와 비슷한 스케일).
+function fingerBendAngle3D(lm, mcpIdx, pipIdx, tipIdx) {
+  const v1 = {
+    x: lm[mcpIdx].x - lm[pipIdx].x,
+    y: lm[mcpIdx].y - lm[pipIdx].y,
+    z: (lm[mcpIdx].z || 0) - (lm[pipIdx].z || 0),
+  };
+  const v2 = {
+    x: lm[tipIdx].x - lm[pipIdx].x,
+    y: lm[tipIdx].y - lm[pipIdx].y,
+    z: (lm[tipIdx].z || 0) - (lm[pipIdx].z || 0),
+  };
+  const m1 = Math.hypot(v1.x, v1.y, v1.z), m2 = Math.hypot(v2.x, v2.y, v2.z);
+  const cosA = (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z) / (m1 * m2 || 1);
+  return Math.acos(Math.min(1, Math.max(-1, cosA))) * 180 / Math.PI;
+}
+
+// 두 랜드마크를 잇는 선분이 화면 평면에서 벗어난 각도(도 단위) 근사.
+// z성분이 차지하는 비율로 계산: 화면과 평행하면 0도, 카메라 쪽/반대쪽으로
+// 기울수록 커진다. 화면에서 원근 압축으로 "짧아 보이는" 정도와 직결된다.
+// (MediaPipe z는 x/y보다 정밀도가 낮아 어림값이므로 문턱은 여유 있게 잡는다)
+function segmentOutOfPlaneTiltDeg(lm, fromIdx, toIdx) {
+  const dx = lm[toIdx].x - lm[fromIdx].x;
+  const dy = lm[toIdx].y - lm[fromIdx].y;
+  const dz = (lm[toIdx].z || 0) - (lm[fromIdx].z || 0);
+  const len = Math.hypot(dx, dy, dz) || 1;
+  return Math.asin(Math.min(1, Math.abs(dz) / len)) * 180 / Math.PI;
+}
+// 엄지척에서 허용하는 "엄지"의 최대 앞뒤 기울기. 엄지(뿌리2->끝4)가 카메라
+// 쪽으로 이 각도보다 기울면 사진에서 엄지가 짧게 뭉개져 보이므로, 엄지가
+// 온전히 다 보이는 각도로 올렸을 때만 인정한다. (손 전체가 아니라 엄지 기준)
+const THUMB_MAX_TILT_DEG = 20;
+// z 기반 각도만으로는 부족한 경우를 위한 2D 보조 문턱. MediaPipe z가 실제
+// 깊이보다 작게 나오는 일이 잦아, 엄지가 90도 가까이 카메라를 향해도 각도
+// 게이트가 안 걸릴 수 있다. 그래서 화면상 엄지 길이(2->4)가 손 크기 기준
+// (손목0->중지뿌리9, 엄지척 자세에서 화면에 온전히 보이는 축)의 이 비율보다
+// 짧으면 "엄지가 원근 압축으로 짧아 보이는 상태"로 판정해 탈락시킨다.
+const THUMB_MIN_VISIBLE_RATIO = 0.55;
+
+// 엄지척: 기존엔 화면 y좌표 비교로만 판정해서 손이 카메라와 평행한 평면에
+// 있을 때만 잘 인식됐음. 손이 앞뒤로 기울면 원근 압축으로 y차이가 뭉개져 실패.
+// -> 손가락 굽힘/엄지 펴짐을 3D 관절 각도로 바꿔 기울기에 강하게 만들고,
+//    "엄지가 위"는 사진의 의미상 화면 기준을 유지하되 엄지 길이 대비 비율로
+//    판정해 손 크기·거리에 무관하게 동작하도록 함.
 function thumbsUpComponent(lm) {
-  const indexCurl = isFingerCurled(lm, 8, 6);
-  const middleCurl = isFingerCurled(lm, 12, 10);
-  const ringCurl = isFingerCurled(lm, 16, 14);
-  const pinkyCurl = isFingerCurled(lm, 20, 18);
-  const thumbUp = lm[4].y < lm[2].y - 0.03;
-  return indexCurl && middleCurl && ringCurl && pinkyCurl && thumbUp;
+  // 엄지가 카메라 쪽으로 기울면 (인식은 가능해도) 사진에서 엄지가
+  // 짧게 보이므로 인정하지 않음 — 엄지가 다 보이는 각도로 올려야 통과.
+  // 1) z 기반 각도 게이트 (z가 정확할 때 동작)
+  if (segmentOutOfPlaneTiltDeg(lm, 2, 4) > THUMB_MAX_TILT_DEG) return false;
+  // 2) 2D 길이 비율 게이트 (z가 과소 보고돼도 원근 압축은 화면에 그대로 드러남)
+  const thumb2D = dist(lm[2], lm[4]);
+  const palm2D = dist(lm[0], lm[9]) || 1;
+  if (thumb2D < THUMB_MIN_VISIBLE_RATIO * palm2D) return false;
+  const indexCurl = fingerBendAngle3D(lm, 5, 6, 8) < 140;
+  const middleCurl = fingerBendAngle3D(lm, 9, 10, 12) < 140;
+  const ringCurl = fingerBendAngle3D(lm, 13, 14, 16) < 140;
+  const pinkyCurl = fingerBendAngle3D(lm, 17, 18, 20) < 140;
+  // 엄지 자체는 곧게 펴져 있어야 함 (굽은 엄지가 우연히 위를 향하는 오검출 방지)
+  const thumbStraight = fingerBendAngle3D(lm, 2, 3, 4) > 140;
+  // 엄지 방향 벡터(2->4)의 위쪽(y-) 성분이 엄지 길이의 35% 이상 = 수평보다 약 20도 이상 위
+  const thumbLen = Math.hypot(
+    lm[4].x - lm[2].x, lm[4].y - lm[2].y, (lm[4].z || 0) - (lm[2].z || 0)
+  );
+  const thumbUp = (lm[2].y - lm[4].y) > 0.35 * thumbLen;
+  return indexCurl && middleCurl && ringCurl && pinkyCurl && thumbStraight && thumbUp;
 }
 
 // 어흥(호랑이 발톱): 손바닥이 보이도록 들고, 손톱이 보이는 정도로만 살짝 구부린 상태
 // (기존엔 거의 주먹 수준으로 구부려야 인식돼서, 살짝만 구부려도 인식되도록 범위를 완화함)
-function tigerClawComponent(lm) {
+function tigerClawComponent(lm, handednessLabel) {
+  // 손바닥이 카메라를 향할 때만 인정 — 손등을 보이거나 옆으로 세운 손은 탈락
+  if (palmFacingScore(lm, handednessLabel) < TIGER_PALM_FACING_MIN) return false;
   const fingers = [[8, 5], [12, 9], [16, 13], [20, 17]]; // [tip, mcp]
   return fingers.every(([tip, mcp]) => {
     const dTip = wristDist(lm, tip);
     const dMcp = wristDist(lm, mcp);
-    // 거의 다 펴진 상태(1.5 이상)만 아니면 되고, 주먹처럼 완전히 접힌 상태(0.75 미만)만 아니면 인정
-    return dTip > dMcp * 0.75 && dTip < dMcp * 1.5;
+    // 완전히 쫙 편 상태(약 1.9배)만 아니면 되고, 주먹처럼 완전히 접힌 상태(0.75 미만)만 아니면 인정
+    // (1.5는 손가락을 꽤 많이 굽혀야 통과돼서 너무 엄격했음 -> 1.7로 완화, 살짝만 굽혀도 인정)
+    return dTip > dMcp * 0.75 && dTip < dMcp * 1.7;
   });
 }
 
@@ -555,9 +690,13 @@ function catEarsComponent(lm) {
   const angleDeg = Math.acos(Math.min(1, Math.max(-1, cosA))) * 180 / Math.PI;
   const angleOk = angleDeg > 10; // 브이 사인보다 넉넉히 벌어져 있으면 인정 (상한 없음)
 
-  const nearHead = lm[8].y < 0.6 && lm[12].y < 0.6; // 손끝이 머리 높이(화면 위쪽) 부근에 위치
+  // (예전엔 손끝이 화면 상위 60% 안에 있어야 하는 nearHead 조건이 있었으나 제거함.
+  //  화면 절대좌표 기준이라 사람이 프레임 어디에 잡히느냐에 따라 같은 동작이
+  //  통과/탈락이 갈렸음. 얼굴 좌표를 실제로 감지하지 않는 이상 "머리 근처"를
+  //  화면 위치로 추정할 수 없고, 손을 뒤집는 wristAboveFingers 조건이 이미
+  //  이 포즈의 방향 특징을 충분히 구분해준다.)
 
-  return ringCurl && pinkyCurl && indexStraight && middleStraight && wristAboveFingers && angleOk && nearHead;
+  return ringCurl && pinkyCurl && indexStraight && middleStraight && wristAboveFingers && angleOk;
 }
 
 // 볼하트: 엄지와 검지를 붙이지 않고, 살짝 구부려 반쪽 하트(둥근 곡선) 모양을 만들어
@@ -566,23 +705,128 @@ function catEarsComponent(lm) {
 // 얼굴 가까이서 촬영하면(=손이 화면을 크게 채우면) 절대 좌표 기준 거리는 훨씬 커지고,
 // 손이 살짝 돌아가면 y좌표 차이로 굽힘을 판정하는 방식이 흔들리기 쉬움. 그래서 모든
 // 거리를 "손 크기(손목~중지 마디)" 대비 비율로 계산해 카메라 거리·각도 변화에 안정적으로 만듦.
-function cheekHeartComponent(lm) {
+// 볼하트에서 허용하는 "손바닥 방향" 점수 띠 (palmFacingScore 재사용).
+// 볼에 손을 대는 자연스러운 자세는 손바닥이 대체로 옆을 향하므로 0 근처가 중심.
+// 하한만 두면(이전 0.05) 손바닥을 정면으로 활짝 돌린 부자연스러운 자세는
+// 무제한 통과하고, 반대로 손이 조금만 돌아가면 바로 탈락하는 비대칭이 생김.
+// -> 살짝 돌아간 것(음수 소폭)은 허용하고, 정면으로 활짝 편 것(큰 양수)은 거른다.
+const CHEEK_PALM_FACING_MIN = -0.25;
+const CHEEK_PALM_FACING_MAX = 0.5;
+
+function cheekHeartComponent(lm, handednessLabel) {
   const handScale = wristDist(lm, 9) || 0.001;
-  const middleFolded = isFingerFolded(lm, 12, 9);
-  const ringFolded = isFingerFolded(lm, 16, 13);
-  const pinkyFolded = isFingerFolded(lm, 20, 17);
+  // 손바닥 방향이 자연스러운 띠 안에 있어야 함 — 손등을 확 보이거나(큰 음수),
+  // 손바닥을 정면으로 활짝 돌린 자세(큰 양수)는 둘 다 탈락
+  const palmScore = palmFacingScore(lm, handednessLabel);
+  const palmOk = palmScore >= CHEEK_PALM_FACING_MIN && palmScore <= CHEEK_PALM_FACING_MAX;
+  // 네 손가락 "살짝 구부림"을 3D 관절 각도로 판정. 이전의 손끝/뿌리 거리 비율
+  // 방식은 "편 채로 카메라 쪽으로 기울인 손가락"이 원근 압축 때문에 굽힌 것처럼
+  // 읽히는 맹점이 있었음(검지만 펴도 통과되던 원인). 관절 각도는 기울기에
+  // 불변: 쫙 폄 ~175도, 살짝 굽힘 130~160도, 주먹 60~90도.
+  // 하한은 "주먹 차단"용. 상방을 140으로 낮춰 "거의 편 손"이 섞이는 걸 더 확실히 막는다.
+  const bendOk = (mcp, pip, tip, lo = 70, hi = 140) => {
+    const a = fingerBendAngle3D(lm, mcp, pip, tip);
+    return a > lo && a < hi;
+  };
+  // 소지는 해부학적으로 다른 손가락을 굽힐 때 따라 굽거나 덜 굽어서 각도가 잘
+  // 튀므로(네 손가락 AND 구조에서 가장 자주 발목을 잡음) 범위만 넓게 둔다.
+  const bentOk = bendOk(5, 6, 8) && bendOk(9, 10, 12) && bendOk(13, 14, 16) && bendOk(17, 18, 20, 65, 140);
+  // PIP 각도(3점 측정)는 완만~중간 굽힘에서는 단조 감소하지만, 손가락을 끝까지
+  // 말면(꽉 쥔 주먹) 손끝이 DIP에서 한 번 더 꺾여 손바닥 쪽으로 파고들면서
+  // PIP→TIP 벡터가 PIP→MCP와 다시 비슷한 방향이 돼 각도가 역전(다시 커짐)한다.
+  // 그래서 각도만으로는 "완전한 주먹"을 못 거른다. 손끝-손목 거리 비율은 말수록
+  // 계속 가까워지기만 해서(역전 없음) 이 극단 구간을 잡는 안전장치로 추가한다.
+  // 문턱 실측 근거: 주먹 0.66~0.73 / 정상 볼하트 1.2~1.55 → 0.9면 확실히 갈라짐
+  const notTightFist = (tip, mcp) => curlRatio(lm, tip, mcp) > 0.9;
+  const notFistOk = notTightFist(8, 5) && notTightFist(12, 9) && notTightFist(16, 13) && notTightFist(20, 17);
   const gapRatio = dist(lm[4], lm[8]) / handScale;
   const gapOk = gapRatio > 0.15 && gapRatio < 1.5; // 완전히 붙지도(핀치), 너무 벌어지지도 않게
-  const upperArea = lm[8].y < 0.8; // 얼굴~볼 높이 부근 (가까이 촬영해도 되도록 여유 있게)
-  return middleFolded && ringFolded && pinkyFolded && gapOk && upperArea;
+  // 테스트 모드에서 어떤 조건이 실패하는지 실시간 확인용 (loop에서 스로틀 출력)
+  if (isGestureTestMode) {
+    const a = (mcp, pip, tip) => fingerBendAngle3D(lm, mcp, pip, tip).toFixed(0);
+    const r = (t, m) => curlRatio(lm, t, m).toFixed(2);
+    window.__poseDebug =
+      `볼하트 · 관절각(70~140도, 소지는 65~140 필요): 검지 ${a(5, 6, 8)} 중지 ${a(9, 10, 12)} 약지 ${a(13, 14, 16)} 소지 ${a(17, 18, 20)}` +
+      ` · 주먹방지비(0.9 초과 필요): 검지 ${r(8, 5)} 중지 ${r(12, 9)} 약지 ${r(16, 13)} 소지 ${r(20, 17)}` +
+      ` · 간격비(0.15~1.5 필요): ${gapRatio.toFixed(2)}` +
+      ` · 손바닥점수(${CHEEK_PALM_FACING_MIN}~${CHEEK_PALM_FACING_MAX} 필요): ${palmScore.toFixed(2)}` +
+      ` · MP라벨: ${handednessLabel || '?'}`;
+  }
+  // (예전엔 검지 끝이 화면 상위 80% 안이어야 하는 upperArea 조건이 있었으나 제거함.
+  //  화면 절대좌표라 사람이 프레임 어디에 잡히느냐에 좌우됨 — 얼굴 좌표를 실제로
+  //  감지하지 않는 이상 "볼 근처"를 화면 위치로 추정할 수 없다는 원칙에 따름)
+  return palmOk && bentOk && notFistOk && gapOk;
 }
 
-// 꽃받침: 손가락을 붙여서 펴고, 턱 밑 높이에 대는 모양 (한 손)
-function flowerComponent(lm) {
-  const allExt = [[8, 6], [12, 10], [16, 14], [20, 18]].every(([t, p]) => isFingerExtended(lm, t, p));
-  const closeGaps = dist(lm[8], lm[12]) < 0.06 && dist(lm[12], lm[16]) < 0.06 && dist(lm[16], lm[20]) < 0.06;
-  const nearFace = lm[0].y > 0.25 && lm[0].y < 0.75; // 얼굴~턱 높이 부근
-  return allExt && closeGaps && nearFace;
+// 손 크기: 랜드마크 21개 전체의 화면상 바운딩박스 대각선.
+// 손목~중지뿌리 같은 특정 선분은 손이 기울면 투영이 쪼그라들지만,
+// 바운딩박스는 손이 어느 방향으로 돌아도 크기가 잘 유지된다.
+function handSpan2D(lm) {
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  for (const p of lm) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return Math.hypot(maxX - minX, maxY - minY) || 0.001;
+}
+
+// 꽃받침: 손가락을 붙여서 펴고, 턱 밑에 컵처럼 받치는 모양.
+// 한 손만 해도 인정하므로 다른 한-손 포즈처럼 손별 컴포넌트로 판정한다
+// (감지된 모든 손이 이 모양이어야 통과 — 양손 꽃받침도 자연히 통과).
+// 기존 판정의 문제 3가지를 교체:
+//  1) 펴짐을 화면 y좌표 비교로 판정 -> 손이 기울면 실패. 3D 관절 각도로 교체
+//  2) 붙임을 절대거리(0.06)로 판정 -> 카메라 거리에 따라 오판. 손 크기 비율로 교체
+//  3) "턱 높이"를 화면 절대좌표(0.25~0.75)로 추정 -> 프레이밍에 좌우되므로 제거하고,
+//     컵 모양의 방향 특징인 "손끝이 손목보다 위"(상대 비교)로 대체
+function flowerComponent(lm, handedness) {
+  // 네 손가락이 펴져 있는지 (3D 관절 각도 — 컵처럼 살짝 오므리는 것까지 허용).
+  // 손가락을 붙이면 이웃 손가락이 서로를 가려 개별 랜드마크가 프레임마다
+  // 흔들리고, AND 판정은 한 손가락만 튀어도 깨져서 유독 불안정했음.
+  // -> 네 손가락 각도의 "평균"으로 그룹 판정: 무작위 노이즈가 상쇄되고,
+  //    꽃받침은 네 손가락이 한 면을 이루는 포즈라 의미상으로도 그룹이 맞음.
+  const angIdx = fingerBendAngle3D(lm, 5, 6, 8);
+  const angMid = fingerBendAngle3D(lm, 9, 10, 12);
+  const angRing = fingerBendAngle3D(lm, 13, 14, 16);
+  const angPinky = fingerBendAngle3D(lm, 17, 18, 20);
+  const avgAngle = (angIdx + angMid + angRing + angPinky) / 4;
+  // 하한 125도: 손바닥이 카메라 쪽으로 조금 돌아가면 오므린 손가락이 카메라를
+  // 향해 관절각이 더 접힌 값으로 나오므로, 135로 두면 손바닥 보이는 꽃받침이 탈락했음.
+  const allExt = avgAngle > 125;
+  // 이웃한 손끝끼리 붙어 있는지 (손 크기 비율 — 붙인 손가락은 약 0.1, 벌리면 0.2+)
+  const span = handSpan2D(lm);
+  const g1 = dist(lm[8], lm[12]) / span;
+  const g2 = dist(lm[12], lm[16]) / span;
+  const g3 = dist(lm[16], lm[20]) / span;
+  // 0.22: 손바닥이 카메라 쪽으로 돌아가면 원근 때문에 손 크기 대비 간격비가
+  // 커져서, 0.18로는 손바닥 보이는 꽃받침이 탈락했음 (벌린 손가락은 0.25+).
+  const closeGaps = g1 < 0.22 && g2 < 0.22 && g3 < 0.22;
+  // 손끝이 손목보다 위 = 컵이 위를 향한 방향 (턱을 받치는 모양)
+  const pointingUp = lm[8].y < lm[0].y && lm[12].y < lm[0].y && lm[16].y < lm[0].y && lm[20].y < lm[0].y;
+  // 손 축(손목→중지 끝)이 수직에서 20도 이상 기울어야 함: 꽃받침은 턱을
+  // 받치느라 손이 얼굴 쪽으로 기울지만, 손가락을 붙여 편 손을 그냥 위로
+  // 세워 든 자세는 수직(0도 근처)이라 여기서 걸러진다.
+  const axisX = lm[12].x - lm[0].x;
+  const axisY = lm[12].y - lm[0].y;
+  const axisLen = Math.hypot(axisX, axisY) || 0.001;
+  const handTiltDeg = Math.acos(Math.min(1, Math.max(-1, -axisY / axisLen))) * 180 / Math.PI;
+  const tiltedEnough = handTiltDeg > 20;
+  // 손등이 카메라를 정면으로 향하면 꽃받침이 아니라 손등을 내민 자세.
+  // 손바닥 정면 = 양수, 옆으로 세움 = 0 근처, 손등 정면 = -0.4 이하로 나오므로
+  // -0.25까지는 허용해 "손등이 살짝 보이는" 각도는 통과시킨다.
+  const palmScore = palmFacingScore(lm, handedness);
+  const notBackFacing = palmScore > -0.25;
+  if (isGestureTestMode) {
+    window.__poseDebug =
+      `꽃받침 · 관절각 평균(125 초과 필요): ${avgAngle.toFixed(0)}` +
+      ` (검지 ${angIdx.toFixed(0)} 중지 ${angMid.toFixed(0)} 약지 ${angRing.toFixed(0)} 소지 ${angPinky.toFixed(0)})` +
+      ` · 손끝간격비(각 0.22 미만): ${g1.toFixed(2)} ${g2.toFixed(2)} ${g3.toFixed(2)}` +
+      ` · 손끝이위: ${pointingUp ? 'O' : 'X'}` +
+      ` · 손기울기(20도 초과 필요): ${handTiltDeg.toFixed(0)}도` +
+      ` · 손바닥점수(-0.25 초과 필요): ${palmScore.toFixed(2)}`;
+  }
+  return allExt && closeGaps && pointingUp && tiltedEnough && notBackFacing;
 }
 
 // 숭이포즈: 검지손가락 끝이 입꼬리(입 주변) 높이에 있으면 인정.
@@ -596,13 +840,69 @@ function mouthPoseComponent(lm) {
 }
 
 // 야호포즈: 브이를 뒤집은 모양. 검지·중지가 펴진 채로 "뿌리보다 아래쪽"을 향해야 함(손톱이 바닥 방향)
-function yahooComponent(lm) {
-  const indexExtended = curlRatio(lm, 8, 5) > 1.15;
-  const middleExtended = curlRatio(lm, 12, 9) > 1.15;
-  const pointingDown = (lm[8].y - lm[5].y) > 0.03 && (lm[12].y - lm[9].y) > 0.03;
-  const ringCurl = curlRatio(lm, 16, 13) < 1.05;
-  const pinkyCurl = curlRatio(lm, 20, 17) < 1.05;
-  return indexExtended && middleExtended && pointingDown && ringCurl && pinkyCurl;
+// 인식은 메인 루프에서 프레임을 180도 돌려 수행하므로(detectHandsRotated180 참고)
+// 여기 들어오는 랜드마크는 대부분 정상 품질이다. 아래의 복구판정은 회전 인식이
+// 실패해 일반 인식으로 폴백한 프레임을 위한 안전망으로만 남겨둔다.
+function yahooComponent(lm, _handedness, worldLm) {
+  // 화면 랜드마크가 손을 옆으로 돌렸을 때 손바닥 쪽으로 뭉쳐도 관절각은
+  // 실제 손 크기·깊이 기준의 월드 랜드마크로 계산한다. 월드 값이 없는
+  // 환경에서만 기존 화면 랜드마크를 대신 사용한다.
+  const poseLm = worldLm && worldLm.length === lm.length ? worldLm : lm;
+  // 화면상 손끝 거리비는 손이 앞뒤로 흔들릴 때 경계값을 자주 넘나들므로
+  // 펴짐은 3D 관절각으로 판정한다. 한 손가락의 미세 노이즈도 허용하도록
+  // 각각의 하한과 두 손가락 평균 하한을 함께 사용한다.
+  const indexAngle = fingerBendAngle3D(poseLm, 5, 6, 8);
+  const middleAngle = fingerBendAngle3D(poseLm, 9, 10, 12);
+  const extendedOk = indexAngle > 120 && middleAngle > 120 && (indexAngle + middleAngle) / 2 > 135;
+
+  // 절대 y좌표차(기존 0.03) 대신 각 손가락 화면 길이 중 아래 방향 성분의
+  // 비율을 본다. 손이 화면에서 작거나 커져도 같은 자세는 같은 값이 나온다.
+  const downRatio = (mcp, tip) => {
+    const dx = lm[tip].x - lm[mcp].x;
+    const dy = lm[tip].y - lm[mcp].y;
+    return dy / (Math.hypot(dx, dy) || 0.001);
+  };
+  const indexDown = downRatio(5, 8);
+  const middleDown = downRatio(9, 12);
+  // 손바닥을 카메라 정면으로 많이 보이지 않아도 되도록 각 손가락은 거의
+  // 수평까지 허용하고, 두 손가락의 평균 방향만 아래쪽이면 인정한다.
+  const pointingDown = indexDown > -0.05 && middleDown > -0.05 &&
+    (indexDown + middleDown) / 2 > 0.1;
+
+  // 약지·소지는 기존 1.05보다 여유 있는 거리비와 관절각을 함께 사용한다.
+  // 접힌 상태 안에서 랜드마크가 조금 흔들려도 판정이 끊기지 않게 한다.
+  const ringAngle = fingerBendAngle3D(poseLm, 13, 14, 16);
+  const pinkyAngle = fingerBendAngle3D(poseLm, 17, 18, 20);
+  const foldedOk = ringAngle < 165 && pinkyAngle < 165 &&
+    curlRatio(lm, 16, 13) < 1.4 && curlRatio(lm, 20, 17) < 1.4;
+
+  // 손끝 랜드마크가 손바닥으로 뭉친 프레임을 위한 복구 판정.
+  // 이 상황에서도 손목(0)과 네 손가락 뿌리(5/9/13/17)는 비교적 안정적이다.
+  // 뒤집힌 손에서는 손가락 뿌리들의 중심이 손목보다 화면 아래에 있으므로,
+  // 이 손바닥 축 방향을 손끝의 아래방향 판정 대신 사용한다.
+  const mcpCenterY = (lm[5].y + lm[9].y + lm[13].y + lm[17].y) / 4;
+  const palmAxisLength = Math.hypot(lm[9].x - lm[0].x, lm[9].y - lm[0].y) || 0.001;
+  const palmDownRatio = (mcpCenterY - lm[0].y) / palmAxisLength;
+  const palmPointsDown = palmDownRatio > 0.2;
+  // 스크린샷처럼 손끝 추정이 무너지면 펴진 손가락 각도도 120도 부근까지
+  // 낮아지므로 복구 경로만 더 관대하게 본다. 반면 약지·소지가 모두 펴진
+  // 손바닥(대개 170도+)은 각도 상한으로 계속 제외한다.
+  const fallbackExtendedOk = indexAngle > 105 && middleAngle > 105 &&
+    (indexAngle + middleAngle) / 2 > 120;
+  const fallbackFoldedOk = ringAngle < 168 && pinkyAngle < 168;
+  const fallbackOk = palmPointsDown && fallbackExtendedOk && fallbackFoldedOk;
+  const preciseOk = extendedOk && pointingDown && foldedOk;
+
+  if (isGestureTestMode) {
+    window.__poseDebug =
+      `야호 · 편 손가락 월드각도(각 120 초과, 평균 135 초과): ${indexAngle.toFixed(0)} / ${middleAngle.toFixed(0)}` +
+      ` · 아래방향비(각 -0.05 초과, 평균 0.1 초과): ${indexDown.toFixed(2)} / ${middleDown.toFixed(2)}` +
+      ` · 접은 손가락 월드각도(각 165 미만): ${ringAngle.toFixed(0)} / ${pinkyAngle.toFixed(0)}` +
+      ` · 접힘거리비(각 1.4 미만): ${curlRatio(lm, 16, 13).toFixed(2)} / ${curlRatio(lm, 20, 17).toFixed(2)}` +
+      ` · 손바닥아래방향비(복구판정 0.2 초과): ${palmDownRatio.toFixed(2)}` +
+      ` · 판정경로: ${preciseOk ? '정밀' : fallbackOk ? '복구' : '실패'}`;
+  }
+  return preciseOk || fallbackOk;
 }
 
 // 놀라는 포즈(id: palmpose): 손등이 카메라를 향하고, 엄지 포함 5손가락이 모두 펴져서
@@ -645,28 +945,174 @@ const COMPONENTS = {
 // handedness(왼손/오른손)가 필요한 컴포넌트(손바닥 포즈 등)에도 쓸 수 있도록 함께 전달.
 function makeChecker(gestureId, minHands) {
   const component = COMPONENTS[gestureId];
-  return function (hands, handednesses) {
+  return function (hands, handednesses, worldHands) {
     if (hands.length < minHands) return false;
-    return hands.every((lm, i) => component(lm, handednesses ? handednesses[i] : undefined));
+    return hands.every((lm, i) => component(
+      lm,
+      handednesses ? handednesses[i] : undefined,
+      worldHands ? worldHands[i] : undefined
+    ));
   };
+}
+
+// 한두 프레임의 랜드마크 흔들림으로 판정이 바뀌지 않도록 최근 결과를 다수결로 평활화한다.
+// 개별 프레임의 ok는 기존과 동일하게 감지된 모든 손이 동작을 만족할 때만 true다.
+// 추가로 손 개수도 함께 기록한다: 판정이 "감지된 손"에만 적용되다 보니, 자세가
+// 틀린 손이 감지에서 깜빡이며 빠지면 그 프레임들이 전부 성공으로 계산돼
+// "반대 손만 잘하면 둘 다 통과"가 되는 구멍이 있었음. 최근 윈도우에서 관측된
+// 최대 손 개수보다 적게 감지된 프레임은 성공으로 치지 않아 이를 막는다.
+function smoothDetection(ok, handCount, gestureId) {
+  detectionHistory.push({ ok, handCount });
+  if (detectionHistory.length > DETECTION_WINDOW_SIZE) {
+    detectionHistory.shift();
+  }
+  const expectedHands = Math.max(...detectionHistory.map(h => h.handCount));
+  const hitCount = detectionHistory.filter(h => h.ok && h.handCount >= expectedHands).length;
+  // 손이 4개 이상 잡히는 다인 촬영은 어떤 포즈든 한 손씩 검출이 자주 깜빡여
+  // 프레임 단위 실패가 잦으므로 완화 기준을 적용한다 (1~2인 판정은 그대로).
+  const requiredHits = gestureId === 'yahoo' || SPECIAL_CHECKERS[gestureId] || expectedHands >= 4
+    ? RELAXED_DETECTION_REQUIRED_HITS
+    : DETECTION_REQUIRED_HITS;
+  return hitCount >= requiredHits;
+}
+
+function resetDetectionStability() {
+  detectionHistory = [];
+  detectionFailureStartTs = null;
 }
 
 // 양손하트(양손 결합): 주먹을 맞대는 게 아니라, 양손을 둥글게 구부려
 // 검지 끝(하트 윗부분 골)과 엄지 끝(하트 아랫부분 뾰족한 점)이 각각 서로 맞닿도록
 // 만드는 동작.
 // 다른 제스처와 달리 "손끼리의 관계"를 봐야 해서 별도 로직으로 처리.
-function bigHeartChecker(hands) {
-  if (hands.length !== 2) return false; // 정확히 두 손일 때만 판정 (양손 or 두 사람이 손을 맞댈 때)
-  const [a, b] = hands;
-  const indexTipsClose = dist(a[8], b[8]) < 0.12; // 검지 끝끼리 맞닿음 (하트 윗부분 골)
-  const thumbTipsClose = dist(a[4], b[4]) < 0.12; // 엄지 끝끼리 맞닿음 (하트 아랫부분 꼭짓점)
-  // 검지가 엄지보다 위에 있어야 함 (손을 뒤집어서 맞대는 등의 오검출 방지)
-  const orientedUp = a[8].y < a[4].y && b[8].y < b[4].y;
-  return indexTipsClose && thumbTipsClose && orientedUp;
+// 여러 명이 함께할 때는 makePairChecker가 가까운 손끼리 짝지어 이 함수를 쌍마다 호출한다.
+function bigHeartPair(a, b) {
+  // 거리 문턱을 절대값(0.12)이 아니라 손 크기 비율로 계산: 절대값은 카메라에서
+  // 멀어져 손이 작아지면 "떨어진 두 손"도 가깝다고 오판했음 (실제 버그였음).
+  // 손 크기는 랜드마크 21개 전체의 화면상 바운딩박스 대각선을 사용한다 —
+  // 손목~중지뿌리 거리를 썼더니 하트를 만들며 손이 기울면 손바닥 투영이
+  // 짧아져 scale이 쪼그라들고, 간격비가 뻥튀기돼 정면 손만 통과되는 문제가 있었음.
+  const span = (h) => {
+    let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (const p of h) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return Math.hypot(maxX - minX, maxY - minY) || 0.001;
+  };
+  const scale = (span(a) + span(b)) / 2;
+  const indexGap = dist(a[8], b[8]) / scale;
+  const thumbGap = dist(a[4], b[4]) / scale;
+  // 두 손이 실제로 맞닿아야 통과: 맞닿은 손끝은 간격비가 대략 0.05~0.15로
+  // 나오므로 0.22면 랜드마크 노이즈 여유를 포함한 "붙음" 판정이 된다.
+  // (예전 0.4는 살짝 벌어진 하트도 통과시켰음. 엄밀한 맞닿음 요구가 프레임
+  // 단위 AND 때문에 인식 불능을 만들던 문제는 지금은 10프레임 중 6프레임
+  // 다수결이 흡수한다.)
+  const indexTipsClose = indexGap < 0.22; // 검지 끝끼리 맞닿음 (하트 윗부분 골)
+  const thumbTipsClose = thumbGap < 0.22; // 엄지 끝끼리 맞닿음 (하트 아랫부분 꼭짓점)
+  // 방향 판정은 화면 위/아래가 아니라 "하트 축"을 기준으로 한다: 화면 기준으로
+  // 보면 하트를 통째로 기울였을 때(고개를 갸웃하며 찍는 스타일) 멀쩡한 하트가
+  // 탈락했음. 축은 엄지 끝 중점(아래 꼭짓점) → 검지 끝 중점(위쪽 골) 방향.
+  const heartUp = {
+    x: (a[8].x + b[8].x) / 2 - (a[4].x + b[4].x) / 2,
+    y: (a[8].y + b[8].y) / 2 - (a[4].y + b[4].y) / 2,
+  };
+  const heartUpLen = Math.hypot(heartUp.x, heartUp.y) || 0.001;
+  heartUp.x /= heartUpLen;
+  heartUp.y /= heartUpLen;
+  // 다만 뒤집힌 하트는 배제: 축이 화면 위쪽에서 100도 이내.
+  // (90도 = 완전히 옆으로 눕힌 하트까지 허용하고, 랜드마크 노이즈 여유로 +10도)
+  const tiltDeg = Math.acos(Math.min(1, Math.max(-1, -heartUp.y))) * 180 / Math.PI;
+  const uprightEnough = tiltDeg <= 100;
+  // 검지 끝이 엄지 끝보다 "하트 위쪽"에 있어야 함 (뒤집어 맞댄 손 오검출 방지)
+  const alongUp = (from, to) => (to.x - from.x) * heartUp.x + (to.y - from.y) * heartUp.y;
+  const orientedUp = alongUp(a[4], a[8]) > 0 && alongUp(b[4], b[8]) > 0;
+  // 엄지가 "하트 아래쪽"을 향해야 함 (하트 아래 꼭짓점을 만드는 방향).
+  // 엄지 뿌리(2)->끝(4) 벡터의 하트 아래방향 성분 비율. 문턱 0.05 =
+  // "위로 향하지만 않으면 됨". 수평으로 마주 대는 스타일도 허용.
+  const thumbDownRatio = (h) => -alongUp(h[2], h[4]) / (dist(h[2], h[4]) || 0.001);
+  const thumbsDown = thumbDownRatio(a) > 0.05 && thumbDownRatio(b) > 0.05;
+  // 하트의 둥근 어깨: 두 손의 검지 뿌리(5)가 좌우로 벌어져 있어야 함.
+  // 손끝만 맞닿고 가운데가 불룩한 게 하트 — 손바닥을 평평하게 모아 붙인
+  // 기도 자세(뿌리까지 다 붙음)를 걸러낸다.
+  const lobeGap = dist(a[5], b[5]) / scale;
+  const lobesApart = lobeGap > 0.2; // 손바닥을 완전히 모아 붙인 자세만 거르는 수준
+  if (isGestureTestMode) {
+    window.__poseDebug =
+      `양손하트 · 검지간격비(0.22 미만): ${indexGap.toFixed(2)}` +
+      ` · 엄지간격비(0.22 미만): ${thumbGap.toFixed(2)}` +
+      ` · 어깨벌어짐비(0.2 초과): ${lobeGap.toFixed(2)}` +
+      ` · 엄지아래방향(0.05 초과): ${thumbDownRatio(a).toFixed(2)} / ${thumbDownRatio(b).toFixed(2)}` +
+      ` · 검지가엄지위(하트축 기준): ${orientedUp ? 'O' : 'X'}` +
+      ` · 하트기울기(100도 이하): ${tiltDeg.toFixed(0)}도`;
+  }
+  return indexTipsClose && thumbTipsClose && orientedUp && thumbsDown && lobesApart && uprightEnough;
+}
+
+// 두 손 결합 포즈(양손하트)를 여러 명이 함께할 수 있도록 확장.
+// 예전엔 손이 정확히 2개일 때만 판정해서, 두 명이 각자 하트를 만들면
+// 손 4개가 감지돼 아예 인식되지 않았다. 감지된 손을 가까운 손끼리 짝짓고
+// (같은 하트/받침을 만드는 두 손은 다른 사람 손보다 항상 가깝다),
+// 모든 짝이 포즈를 만족해야 인정한다. 홀수 개면 짝 없는 손이 있으므로 실패.
+// 오버레이 색은 짝 단위로 칠할 수 있게 손별 결과를 lastPairPerHandOk에 남긴다.
+let lastPairPerHandOk = null;
+function makePairChecker(pairFn, label) {
+  return function (hands) {
+    lastPairPerHandOk = hands.map(() => false);
+    if (hands.length < 2 || hands.length % 2 !== 0) {
+      if (isGestureTestMode) {
+        window.__poseDebug = `${label} · 감지된 손 ${hands.length}개 — 두 손씩 짝을 지을 수 없음`;
+      }
+      return false;
+    }
+    const centroid = (hand) => {
+      let sx = 0, sy = 0;
+      for (const p of hand) { sx += p.x; sy += p.y; }
+      return { x: sx / hand.length, y: sy / hand.length };
+    };
+    const centers = hands.map(centroid);
+    // 전체에서 가장 가까운 두 손부터 차례로 짝짓는다 (손 4개면 2쌍).
+    const remaining = hands.map((_, i) => i);
+    const pairs = [];
+    while (remaining.length > 1) {
+      let best = null;
+      for (let i = 0; i < remaining.length; i++) {
+        for (let j = i + 1; j < remaining.length; j++) {
+          const d = Math.hypot(
+            centers[remaining[i]].x - centers[remaining[j]].x,
+            centers[remaining[i]].y - centers[remaining[j]].y
+          );
+          if (!best || d < best.d) best = { i, j, d };
+        }
+      }
+      pairs.push([remaining[best.i], remaining[best.j]]);
+      remaining.splice(best.j, 1);
+      remaining.splice(best.i, 1);
+    }
+    const debugs = [];
+    const results = pairs.map(([i, j]) => {
+      const ok = pairFn(hands[i], hands[j]);
+      lastPairPerHandOk[i] = ok;
+      lastPairPerHandOk[j] = ok;
+      if (isGestureTestMode && window.__poseDebug) {
+        debugs.push(window.__poseDebug);
+        window.__poseDebug = null;
+      }
+      return ok;
+    });
+    if (isGestureTestMode) {
+      window.__poseDebug = pairs.length > 1
+        ? `${label} ${pairs.length}쌍 판정 → ` + debugs.join(' ‖ ')
+        : debugs[0] || null;
+    }
+    return results.every(Boolean);
+  };
 }
 
 const SPECIAL_CHECKERS = {
-  bigheart: bigHeartChecker,
+  bigheart: makePairChecker(bigHeartPair, '양손하트'),
 };
 
 const CHECKERS = {};
@@ -675,19 +1121,139 @@ GESTURES.forEach(g => {
 });
 
 // ---------- 메인 루프 ----------
+// 야호 전용 인식 경로: 손 모델은 손가락이 위를 향한 손 위주로 학습돼 있어
+// 뒤집힌 손은 손끝 랜드마크가 손바닥 쪽으로 뭉치게 추정된다(마커가 손바닥에
+// 모이는 문제의 원인). 프레임을 180도 돌려 뒤집힌 브이를 정상 브이로 보이게
+// 인식한 뒤, 좌표를 원래 방향으로 되돌린다.
+let rot180Canvas = null;
+let rot180Ctx = null;
+function detectHandsRotated180() {
+  if (!rot180Canvas) {
+    rot180Canvas = document.createElement('canvas');
+    rot180Ctx = rot180Canvas.getContext('2d', { willReadFrequently: true });
+  }
+  if (rot180Canvas.width !== video.videoWidth || rot180Canvas.height !== video.videoHeight) {
+    rot180Canvas.width = video.videoWidth;
+    rot180Canvas.height = video.videoHeight;
+  }
+  rot180Ctx.save();
+  rot180Ctx.translate(rot180Canvas.width, rot180Canvas.height);
+  rot180Ctx.rotate(Math.PI);
+  rot180Ctx.drawImage(video, 0, 0);
+  rot180Ctx.restore();
+  const r = handLandmarker.detectForVideo(rot180Canvas, performance.now());
+  return {
+    // 화면 좌표는 (1-x, 1-y), 월드 좌표는 (-x, -y)로 되돌리면 원본 프레임 기준이 된다.
+    landmarks: (r.landmarks || []).map(hand => hand.map(p => ({ x: 1 - p.x, y: 1 - p.y, z: p.z }))),
+    worldLandmarks: (r.worldLandmarks || []).map(hand => hand.map(p => ({ x: -p.x, y: -p.y, z: p.z }))),
+    handednesses: r.handednesses || [],
+  };
+}
+
+// 같은 손이 두 번 검출된 "유령 손" 정리. numHands를 여유 있게 잡으면 한 손이
+// 겹친 위치에 중복으로 잡히는 프레임이 있는데(특히 회전 인식의 뒤집힌 손),
+// 판정은 감지된 모든 손이 포즈를 만족해야 하므로 유령 손 하나가 인식 전체를
+// 막는다. 두 손의 랜드마크 중심이 손 크기 대비 매우 가까우면 중복으로 보고
+// handedness 점수가 높은 쪽만 남긴다. 실제 두 손은 겹쳐 잡아도 중심이 이만큼
+// 가까워지지 않는다.
+function dedupeDetectedHands(result) {
+  const lms = result.landmarks || [];
+  if (lms.length < 2) return result;
+  const centroid = (hand) => {
+    let sx = 0, sy = 0;
+    for (const p of hand) { sx += p.x; sy += p.y; }
+    return { x: sx / hand.length, y: sy / hand.length };
+  };
+  const spanOf = (hand) => {
+    let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (const p of hand) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return Math.hypot(maxX - minX, maxY - minY) || 0.001;
+  };
+  const scoreOf = (i) => {
+    const h = (result.handednesses || [])[i];
+    return (h && h[0] && h[0].score) || 0;
+  };
+  const centers = lms.map(centroid);
+  const spans = lms.map(spanOf);
+  const dropped = new Set();
+  for (let i = 0; i < lms.length; i++) {
+    if (dropped.has(i)) continue;
+    for (let j = i + 1; j < lms.length; j++) {
+      if (dropped.has(j)) continue;
+      // 문턱 0.2: 유령 손은 진짜 손과 거의 같은 자리에 겹치므로 이 정도면 충분히
+      // 잡힌다. 0.4로 뒀더니 양손하트처럼 두 손이 겹치는 포즈에서 진짜 손을
+      // 중복으로 오판해 지워버렸다 (손이 홀수가 돼 쌍 판정이 무조건 실패).
+      const centerDist = Math.hypot(centers[i].x - centers[j].x, centers[i].y - centers[j].y);
+      if (centerDist < 0.2 * Math.max(spans[i], spans[j])) {
+        dropped.add(scoreOf(i) >= scoreOf(j) ? j : i);
+      }
+    }
+  }
+  if (dropped.size === 0) return result;
+  const keep = (arr) => (arr || []).filter((_, i) => !dropped.has(i));
+  return {
+    landmarks: keep(result.landmarks),
+    worldLandmarks: keep(result.worldLandmarks),
+    handednesses: keep(result.handednesses),
+  };
+}
+
 function loop() {
   if (!handLandmarker) return;
   if (currentIdx >= sequence.length) return; // 8장 다 찍음
 
   if (video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
-    const result = handLandmarker.detectForVideo(video, performance.now());
+    const gestureDef = sequence[currentIdx];
+    // 야호는 회전 인식을 먼저 시도하고, 회전 프레임에서 손을 못 찾으면(아직
+    // 손을 뒤집기 전 등) 일반 인식으로 폴백해 노란 마커 피드백은 유지한다.
+    let result = null;
+    let usedRotation = false;
+    if (gestureDef.id === 'yahoo') {
+      const rotated = detectHandsRotated180();
+      if (rotated.landmarks.length > 0) {
+        result = rotated;
+        usedRotation = true;
+      }
+    }
+    if (!result) result = handLandmarker.detectForVideo(video, performance.now());
+    result = dedupeDetectedHands(result);
     const hands = result.landmarks || [];
+    const worldHands = result.worldLandmarks || [];
     // 손등/손바닥 방향 판정에 필요한 왼손/오른손 라벨 추출 (손바닥 포즈에서 사용)
     const handednesses = (result.handednesses || []).map(h => (h && h[0] && h[0].categoryName) || 'Right');
-    const gestureDef = sequence[currentIdx];
-    const ok = !inResetGap && CHECKERS[gestureDef.id](hands, handednesses);
-    drawOverlay(result, ok);
+    const rawOk = CHECKERS[gestureDef.id](hands, handednesses, worldHands);
+    // 손별 개별 판정 (오버레이 점 색깔용): 예전엔 모든 손을 전체 판정 하나로
+    // 칠해서, 판정에 참여 안 한 손(감지 누락 후 재등장 등)까지 초록으로 보이는
+    // 착시가 있었음. 양손 관계 판정(양손하트)은 짝 단위 결과로 칠해서
+    // 여러 명이 함께할 때 어느 쌍이 안 되고 있는지 보이게 한다.
+    const perHandOk = SPECIAL_CHECKERS[gestureDef.id]
+      ? (lastPairPerHandOk && lastPairPerHandOk.length === hands.length
+          ? [...lastPairPerHandOk]
+          : hands.map(() => rawOk))
+      : hands.map((lm, i) => COMPONENTS[gestureDef.id](lm, handednesses[i], worldHands[i]));
+    // 테스트 모드: 판정 함수가 남긴 내부 값을 0.5초마다 로그로 출력 (문턱 튜닝용)
+    if (isGestureTestMode && gestureDef.id === 'yahoo' && window.__poseDebug) {
+      window.__poseDebug += ` · 인식경로: ${usedRotation ? '회전(180도)' : '일반'}`;
+    }
+    if (isGestureTestMode && window.__poseDebug && performance.now() - (window.__poseDebugTs || 0) > 500) {
+      window.__poseDebugTs = performance.now();
+      log(window.__poseDebug);
+      window.__poseDebug = null;
+    }
+    // 촬영 직후 준비 시간에는 기록을 쌓지 않아 다음 동작 판정에 실패 프레임이 섞이지 않게 한다.
+    const ok = !inResetGap && smoothDetection(rawOk, hands.length, gestureDef.id);
+    // 야호의 마커 색은 흔들리는 단일 프레임 판정 대신 최근 프레임의 안정화
+    // 결과를 사용한다. 위치는 원본 랜드마크를 유지하되 초록/노랑 진동을 줄인다.
+    const overlayPerHandOk = gestureDef.id === 'yahoo' && hands.length === 1
+      ? [ok]
+      : perHandOk;
+    drawOverlay(result, overlayPerHandOk);
 
     if (!inResetGap) {
       handleDetection(ok, hands.length, gestureDef.minHands);
@@ -696,17 +1262,20 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-function drawOverlay(result, ok) {
+function drawOverlay(result, perHandOk) {
   octx.clearRect(0, 0, overlay.width, overlay.height);
   if (!result.landmarks) return;
-  octx.fillStyle = ok ? '#5ee08a' : '#ffd54a'; // 동작 만족 시 초록, 아니면 기존 노랑
-  for (const hand of result.landmarks) {
+  // 손마다 "그 손이" 동작을 만족하는지에 따라 색을 칠한다 (초록/노랑).
+  // 전체 판정 하나로 모든 손을 칠하면, 심사에 참여하지 않은 손까지 통과한
+  // 것처럼 보이는 착시가 생긴다.
+  result.landmarks.forEach((hand, i) => {
+    octx.fillStyle = perHandOk[i] ? '#5ee08a' : '#ffd54a';
     for (const pt of hand) {
       octx.beginPath();
       octx.arc(pt.x * overlay.width, pt.y * overlay.height, 3, 0, Math.PI * 2);
       octx.fill();
     }
-  }
+  });
 }
 
 function handleDetection(ok, handCount, minHands) {
@@ -714,11 +1283,19 @@ function handleDetection(ok, handCount, minHands) {
   if (countdownStartTs !== null) {
     // 카운트다운 진행 중
     if (!ok) {
-      // 자세 풀림 -> 카운트다운 취소
-      countdownStartTs = null;
-      countdownNumEl.textContent = '';
-      subStatusEl.innerHTML = `<span class="hint-wait">자세가 풀렸어요. 모든 사람이 다시 동작을 만들어주세요${countInfo}</span>`;
-      return;
+      // 짧은 랜드마크 누락은 허용하고, 실패가 400ms 이상 이어질 때만 카운트다운을 취소한다.
+      if (detectionFailureStartTs === null) {
+        detectionFailureStartTs = performance.now();
+      }
+      if (performance.now() - detectionFailureStartTs >= FAILURE_GRACE_MS) {
+        countdownStartTs = null;
+        countdownNumEl.textContent = '';
+        resetDetectionStability();
+        subStatusEl.innerHTML = `<span class="hint-wait">자세가 풀렸어요. 모든 사람이 다시 동작을 만들어주세요${countInfo}</span>`;
+        return;
+      }
+    } else {
+      detectionFailureStartTs = null;
     }
     const elapsed = performance.now() - countdownStartTs;
     const remain = Math.ceil((COUNTDOWN_MS - elapsed) / 1000);
@@ -732,8 +1309,9 @@ function handleDetection(ok, handCount, minHands) {
   }
 
   if (ok) {
-    // 동작이 인식되는 즉시 바로 촬영 카운트다운 시작 (기다리는 시간 없이 바로 진행)
+    // 최근 10프레임 중 8프레임 이상 인식되면 촬영 카운트다운 시작
     countdownStartTs = performance.now();
+    detectionFailureStartTs = null;
   } else {
     const needMsg = minHands > 1 ? ` (최소 ${minHands}개 손 필요)` : '';
     subStatusEl.innerHTML = `<span class="hint-wait">동작을 인식하는 중...${needMsg}${countInfo}</span>`;
@@ -752,14 +1330,16 @@ function capturePhoto() {
   tctx.drawImage(video, 0, 0, tmp.width, tmp.height);
   const dataUrl = tmp.toDataURL('image/jpeg', 0.92);
   capturedPhotos.push({ dataUrl, gestureName: gestureDef.name, round: gestureDef.round });
-  log(`촬영 완료: ${gestureDef.name} (${gestureDef.round}/2) [${capturedPhotos.length}/8]`);
+  const roundTotal = isGestureTestMode ? sequence.length : 2;
+  log(`촬영 완료: ${gestureDef.name} (${gestureDef.round}/${roundTotal}) [${capturedPhotos.length}/${sequence.length}]`);
 
   countdownStartTs = null;
+  resetDetectionStability();
   countdownNumEl.textContent = '';
   currentIdx++;
 
   if (currentIdx >= sequence.length) {
-    subStatusEl.textContent = '8장 촬영 완료! 선택 화면으로 이동합니다';
+    subStatusEl.textContent = `${sequence.length}장 촬영 완료! 선택 화면으로 이동합니다`;
     setTimeout(showSelectView, 800);
     return;
   }
@@ -772,8 +1352,9 @@ function capturePhoto() {
 
 function showCurrentGesture() {
   const g = sequence[currentIdx];
+  const roundTotal = isGestureTestMode ? sequence.length : 2;
   gestureNameEl.textContent = g.name;
-  progressTextEl.textContent = `${currentIdx + 1} / ${sequence.length}번째 촬영  (${g.name.split(' ')[0]} - ${g.round}/2회차)`;
+  progressTextEl.textContent = `${isGestureTestMode ? '테스트 모드 · ' : ''}${currentIdx + 1} / ${sequence.length}번째 촬영  (${g.name.split(' ')[0]} - ${g.round}/${roundTotal}회차)`;
   guideCaptionEl.textContent = GUIDE_CAPTION[g.id] || '';
 }
 

@@ -17,6 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 const PORT = process.env.PORT || 8787;
+const CLOUDFLARE_TIMEOUT_MS = 100_000;
 const ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 // 이미지+마스크를 입력받는 인페인팅 모델. 다른 모델로 바꾸고 싶으면 이 값만 수정.
@@ -30,12 +31,45 @@ if (!ACCOUNT_ID || !API_TOKEN) {
   process.exit(1);
 }
 
+// App Runner 같은 리버스 프록시 뒤에서 실제 요청 프로토콜/IP를 올바르게 인식한다.
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
+// 웹캠은 배포 환경에서 HTTPS로만 동작한다. App Runner가 TLS를 종료하므로,
+// 브라우저에는 동일 출처의 카메라만 허용한다는 보안 헤더를 내려준다.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=()');
+  next();
+});
+
+// AWS 상태 확인은 외부 AI를 호출하지 않고 서버 프로세스 자체만 검사한다.
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+// 캔버스 이미지(PNG base64)와 마스크 바이트 배열까지 들어오므로 바디 용량 여유 있게
+app.use(express.json({ limit: '25mb' }));
+
 // 프론트엔드 정적 파일(html) 서빙 — server.js와 같은 폴더에 있는 html 파일들을
 // 그대로 서빙한다. 이 서버를 거쳐서 열어야 fetch('/api/generate-frame')가 연결된다.
 app.use(express.static(__dirname));
 
-// 캔버스 이미지(PNG base64)와 마스크 바이트 배열까지 들어오므로 바디 용량 여유 있게
-app.use(express.json({ limit: '25mb' }));
+async function fetchCloudflare(url, options) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CLOUDFLARE_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function isValidDimension(value) {
+  return Number.isInteger(value) && value >= 256 && value <= 2048;
+}
 
 app.post('/api/generate-frame', async (req, res) => {
   try {
@@ -51,8 +85,17 @@ app.post('/api/generate-frame', async (req, res) => {
       guidance,
     } = req.body || {};
 
-    if (!prompt) {
+    if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: 'prompt가 필요합니다.' });
+    }
+    if (prompt.length > 4000) {
+      return res.status(400).json({ error: 'prompt는 4000자 이하여야 합니다.' });
+    }
+    if (!isValidDimension(width) || !isValidDimension(height)) {
+      return res.status(400).json({ error: 'width와 height는 256~2048 사이의 정수여야 합니다.' });
+    }
+    if (typeof image !== 'string' || !Array.isArray(mask)) {
+      return res.status(400).json({ error: 'image와 mask가 올바른 형식이어야 합니다.' });
     }
 
     const cfBody = {
@@ -70,7 +113,7 @@ app.post('/api/generate-frame', async (req, res) => {
     // undefined 필드는 그대로 보내면 일부 모델에서 검증 오류가 날 수 있어 제거
     Object.keys(cfBody).forEach((k) => cfBody[k] === undefined && delete cfBody[k]);
 
-    const cfRes = await fetch(
+    const cfRes = await fetchCloudflare(
       `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/${MODEL}`,
       {
         method: 'POST',
@@ -112,7 +155,10 @@ app.post('/api/generate-frame', async (req, res) => {
     return res.json({ image: base64, mime: contentType || 'image/png' });
   } catch (err) {
     console.error('[generate-frame 오류]', err);
-    return res.status(500).json({ error: err.message || '알 수 없는 서버 오류' });
+    if (err && err.name === 'AbortError') {
+      return res.status(504).json({ error: 'AI 생성 요청 시간이 초과되었습니다. 다시 시도해주세요.' });
+    }
+    return res.status(500).json({ error: 'AI 프레임 생성 중 서버 오류가 발생했습니다.' });
   }
 });
 
@@ -126,6 +172,9 @@ app.post('/api/theme-keywords', async (req, res) => {
     if (!text || !String(text).trim()) {
       return res.status(400).json({ error: 'text가 필요합니다.' });
     }
+    if (String(text).length > 300) {
+      return res.status(400).json({ error: 'text는 300자 이하여야 합니다.' });
+    }
 
     const systemPrompt =
       'You convert a short theme/scene description, possibly written in Korean or any other ' +
@@ -137,7 +186,7 @@ app.post('/api/theme-keywords', async (req, res) => {
       '5 words. Do not use the word "tiny". Do not add explanations, quotes, numbering, or any text ' +
       'other than the comma-separated list.';
 
-    const cfRes = await fetch(
+    const cfRes = await fetchCloudflare(
       `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/${TEXT_MODEL}`,
       {
         method: 'POST',
@@ -169,12 +218,37 @@ app.post('/api/theme-keywords', async (req, res) => {
     return res.json({ keywords });
   } catch (err) {
     console.error('[theme-keywords 오류]', err);
-    return res.status(500).json({ error: err.message || '알 수 없는 서버 오류' });
+    if (err && err.name === 'AbortError') {
+      return res.status(504).json({ error: '테마 분석 요청 시간이 초과되었습니다. 다시 시도해주세요.' });
+    }
+    return res.status(500).json({ error: '테마 분석 중 서버 오류가 발생했습니다.' });
   }
 });
 
-app.listen(PORT, () => {
+// API 요청 오류는 정적 HTML 응답이 아니라 JSON으로 통일한다.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: '존재하지 않는 API입니다.' });
+});
+
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.too.large') {
+    return res.status(413).json({ error: '요청 이미지가 너무 큽니다. 최대 요청 크기는 25MB입니다.' });
+  }
+  console.error('[요청 처리 오류]', err);
+  return res.status(500).json({ error: '요청 처리 중 서버 오류가 발생했습니다.' });
+});
+
+const server = app.listen(PORT, () => {
   console.log(`서버 실행 중: http://localhost:${PORT}`);
   console.log(`-> http://localhost:${PORT}/index.html 또는 http://localhost:${PORT}/public_index.html 로 열어야 AI 프레임 생성이 동작합니다.`);
   console.log(`   (파일을 더블클릭해서 file://로 열면 /api/generate-frame 호출이 실패합니다.)`);
 });
+
+function shutdown(signal) {
+  console.log(`${signal} 수신: 새 요청을 중단하고 서버를 종료합니다.`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

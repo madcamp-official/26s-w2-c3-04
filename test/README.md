@@ -3,6 +3,10 @@
 Node.js와 Express로 정적 프론트엔드를 제공하고 Cloudflare Workers AI를 대신
 호출하는 무상태 백엔드입니다. DB와 서버 파일 저장소를 사용하지 않습니다.
 
+배포 기준 프론트엔드는 `public_index.html`입니다. 서버의 `/`와 `/index.html`도
+항상 이 파일을 제공합니다. 기존 `index.html`은 참고용 레거시 파일이며 배포 진입점이
+아닙니다.
+
 ## 1. 준비물
 - Node.js 22 이상 (AWS App Runner 배포 런타임과 동일한 버전 권장)
 - Cloudflare 계정 ID, Workers AI 권한이 있는 API 토큰 (이미 갖고 계신 값)
@@ -45,7 +49,7 @@ GET http://localhost:8787/health
 **⚠️ 중요: HTML 파일을 더블클릭해서 직접 열면 안 됩니다.** 반드시 브라우저에서 아래 주소로 접속하세요:
 
 ```
-http://localhost:8787/index.html
+http://localhost:8787/
 ```
 
 파일을 `file://`로 직접 열면 `fetch('/api/generate-frame')`가 이 서버로 연결되지 않아서 다시 "Failed to fetch" 에러가 납니다. 위 주소로 접속해야 프론트엔드와 백엔드가 같은 서버(localhost:8787)에서 동작해서 정상적으로 통신합니다.
@@ -59,3 +63,4 @@ http://localhost:8787/index.html
 
 이 폴더에는 App Runner 소스 배포 설정인 `apprunner.yaml`이 포함되어 있습니다.
 실제 AWS 리소스 생성 전 준비사항과 콘솔 입력값은 `AWS_DEPLOY.md`를 확인하세요.
+프론트엔드 변경과 백엔드 API의 경계는 `ARCHITECTURE.md`를 확인하세요.

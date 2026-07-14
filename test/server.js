@@ -1,6 +1,6 @@
 // AI 인생네컷 - AI 프레임 생성 백엔드
 //
-// 역할: 프론트(intergration.html)가 호출하는 POST /api/generate-frame 요청을 받아서,
+// 역할: 프론트(public_index.html)가 호출하는 POST /api/generate-frame 요청을 받아서,
 // Cloudflare Workers AI의 REST API(인페인팅 모델)로 그대로 전달하고, 결과 이미지를
 // 프론트가 기대하는 형태({ image: base64문자열, mime })로 바꿔서 돌려준다.
 //
@@ -52,8 +52,14 @@ app.get('/health', (req, res) => {
 // 캔버스 이미지(PNG base64)와 마스크 바이트 배열까지 들어오므로 바디 용량 여유 있게
 app.use(express.json({ limit: '25mb' }));
 
-// 프론트엔드 정적 파일(html) 서빙 — server.js와 같은 폴더에 있는 html 파일들을
-// 그대로 서빙한다. 이 서버를 거쳐서 열어야 fetch('/api/generate-frame')가 연결된다.
+// public_index.html을 유일한 배포 진입점으로 사용한다. 이전 주소(/index.html)로
+// 접속해도 같은 완성본을 제공해서 오래된 링크가 레거시 파일을 열지 않게 한다.
+app.get(['/', '/index.html'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public_index.html'));
+});
+
+// 나머지 정적 파일도 같은 폴더에서 제공한다. 이 서버를 거쳐서 열어야
+// public_index.html의 상대 API 경로(/api/...)가 같은 출처로 연결된다.
 app.use(express.static(__dirname));
 
 async function fetchCloudflare(url, options) {
@@ -240,7 +246,7 @@ app.use((err, req, res, next) => {
 
 const server = app.listen(PORT, () => {
   console.log(`서버 실행 중: http://localhost:${PORT}`);
-  console.log(`-> http://localhost:${PORT}/index.html 또는 http://localhost:${PORT}/public_index.html 로 열어야 AI 프레임 생성이 동작합니다.`);
+  console.log(`-> http://localhost:${PORT}/ 에서 public_index.html 통합 페이지가 열립니다.`);
   console.log(`   (파일을 더블클릭해서 file://로 열면 /api/generate-frame 호출이 실패합니다.)`);
 });
 

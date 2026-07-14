@@ -13,6 +13,7 @@ AWS 계정 정보나 실제 Cloudflare 토큰이 포함되어 있지 않습니�
 - Cloudflare 요청 제한 시간: 100초
 - 요청 본문 최대 크기: 25MB
 - DB 및 영구 파일 저장: 사용하지 않음
+- 유일한 프론트엔드 진입점: `public_index.html`
 
 ## AWS에서 친구가 진행할 작업
 
@@ -44,7 +45,7 @@ CLOUDFLARE_TEXT_MODEL
 ## 배포 후 확인 순서
 
 1. App Runner가 제공한 HTTPS 주소의 `/health`에서 `{"status":"ok"}`를 확인합니다.
-2. HTTPS 주소의 `/index.html` 또는 `/public_index.html`을 엽니다.
+2. App Runner가 제공한 HTTPS 주소의 `/`를 열고 `public_index.html` 통합 화면인지 확인합니다.
 3. 브라우저 카메라 권한을 허용하고 사진 촬영을 확인합니다.
 4. 자유 테마 분석과 AI 프레임 생성을 각각 한 번씩 확인합니다.
 5. App Runner 로그에 토큰이나 이미지 본문이 출력되지 않는지 확인합니다.
@@ -72,3 +73,13 @@ npm start
 ```
 
 `.env`는 `.gitignore`에 포함되어 있으므로 커밋하지 않습니다.
+
+## 이후 기능 수정 시 배포 구조 유지
+
+- 프롬프트, 테마 UI, 동작 인식, 촬영 및 합성 로직은 `public_index.html`에서 수정합니다.
+- 위 프론트엔드 수정은 API 요청 형식을 유지하는 한 `server.js`, `apprunner.yaml`,
+  Secrets Manager, IAM 설정을 변경할 필요가 없습니다.
+- App Runner 자동 배포를 켰다면 이 브랜치에 push한 뒤 새 버전이 자동 배포됩니다.
+- API 요청/응답 형식, 환경변수, npm 의존성, 요청 크기 또는 제한 시간을 바꿀 때만
+  백엔드나 배포 설정을 함께 검토합니다.
+- 구체적인 변경 경계와 API 약속은 `ARCHITECTURE.md`를 기준으로 판단합니다.

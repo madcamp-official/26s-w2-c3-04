@@ -4,3 +4,7 @@
 ai4cut/.env
 test/.env
 test/node_modules/
+test/univ-logos
+test/logos
+figma_ui/node_modules/
+figma_ui/dist/

@@ -113,10 +113,6 @@ Cloudflare Workers AI
 
 ### 화면 / 인터페이스 설계
 
-단일 페이지 웹 앱 ([test/public_index.html](test/public_index.html)) 흐름:
-
-1. 카메라 미리보기 + 포즈 안내 → 2. 자동 촬영 → 3. 사진 4장 선택 → 4. 테마 입력·프레임 생성 → 5. 4컷 합성 결과·다운로드
-
 #### 1. 오프닝 화면
 
 <p align="center">

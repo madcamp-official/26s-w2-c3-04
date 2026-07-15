@@ -3,8 +3,6 @@
 4cut_demo/.env
 ai4cut/.env
 test/.env
-test/node_modules/
-test/univ-logos
-test/logos
+test/node_modules
 figma_ui/node_modules/
 figma_ui/dist/

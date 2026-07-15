@@ -644,24 +644,28 @@ function tigerClawComponent(lm, handednessLabel) {
   });
 }
 
-// 고양이 귀: 검지·중지를 곧게 편 채로 넓게 벌려서(V보다 더 벌어진 삼각형 모양), 손목이
-// 손끝보다 위(더 높은 곳)에 있도록 손을 뒤집어(손등이 보이게) 손끝이 머리에 닿는 모양.
-// (직전 버전은 손목-손끝 위아래 관계를 안 봐서, 손가락이 위로 향한 일반 브이 사인도
-//  똑같이 통과돼버렸음. "손목이 손끝보다 위에 있는지"만 다시 검사해서 방향을 구분함 -
-//  손목/손끝 두 점만 비교하므로, 팔 전체가 대각선으로 들려도 흔들리지 않음)
+// 고양이 귀: 손목을 꼭짓점으로 검지·중지가 선명한 V자를 만들고, 그 V가 머리 쪽
+// 아래를 향하는 모양. V자 형성을 핵심으로 보고 나머지 손가락과 방향 조건은 느슨하게 둔다.
 function catEarsComponent(lm) {
-  // 검지·중지가 곧게 펴져 있는지 (완전히 편 손가락은 관절 각도가 180도에 가까움)
-  const indexStraight = fingerBendAngle(lm, 5, 6, 8) > 140;
-  const middleStraight = fingerBendAngle(lm, 9, 10, 12) > 140;
-  if (!indexStraight || !middleStraight) return false;
+  // 핵심 조건은 손목을 꼭짓점으로 검지·중지가 만드는 V자다. 두 손가락은
+  // 완전히 곧을 필요 없이, V의 두 변으로 보일 정도로만 펴져 있으면 된다.
+  const indexAngle = fingerBendAngle(lm, 5, 6, 8);
+  const middleAngle = fingerBendAngle(lm, 9, 10, 12);
+  const indexUsable = indexAngle > 110;
+  const middleUsable = middleAngle > 110;
 
-  // 약지·소지는 주먹처럼 접혀야 함 (관절 각도 기준, 회전에 영향받지 않음)
-  const ringCurl = fingerBendAngle(lm, 13, 14, 16) < 140;
-  const pinkyCurl = fingerBendAngle(lm, 17, 18, 20) < 140;
+  // 약지·소지는 완전히 주먹처럼 접지 않아도 된다. 각도 또는 손목거리 중
+  // 하나만 접힌 모양이면 인정해 V자 판정을 방해하지 않게 한다.
+  const ringCurl = fingerBendAngle(lm, 13, 14, 16) < 160 || curlRatio(lm, 16, 13) < 1.45;
+  const pinkyCurl = fingerBendAngle(lm, 17, 18, 20) < 160 || curlRatio(lm, 20, 17) < 1.45;
 
-  // 손목(0)이 검지·중지 손끝보다 위(작은 y)에 있어야 함 = 손등 쪽이 위, 손끝이 머리 쪽 아래
-  // (일반 브이 사인처럼 손가락이 손목보다 위로 향하면 이 조건에서 걸러짐)
-  const wristAboveFingers = lm[0].y < lm[8].y && lm[0].y < lm[12].y;
+  // 일반 브이와 구분하는 보조 조건. 두 손끝 각각을 강제하지 않고, V의 중심이
+  // 손목보다 아래를 향하는지만 길이 비율로 느슨하게 확인한다.
+  const tipMid = { x: (lm[8].x + lm[12].x) / 2, y: (lm[8].y + lm[12].y) / 2 };
+  const centerDx = tipMid.x - lm[0].x;
+  const centerDy = tipMid.y - lm[0].y;
+  const downwardRatio = centerDy / (Math.hypot(centerDx, centerDy) || 0.001);
+  const pointsDown = downwardRatio > 0.1;
 
   // 손목(0)을 꼭짓점으로 검지 끝(8)·중지 끝(12)까지의 벌어진 각도
   const v1 = { x: lm[8].x - lm[0].x, y: lm[8].y - lm[0].y };
@@ -669,15 +673,19 @@ function catEarsComponent(lm) {
   const mag1 = Math.hypot(v1.x, v1.y), mag2 = Math.hypot(v2.x, v2.y);
   const cosA = (v1.x * v2.x + v1.y * v2.y) / (mag1 * mag2 || 1);
   const angleDeg = Math.acos(Math.min(1, Math.max(-1, cosA))) * 180 / Math.PI;
-  const angleOk = angleDeg > 10; // 브이 사인보다 넉넉히 벌어져 있으면 인정 (상한 없음)
+  const angleOk = angleDeg > 12; // V가 눈에 보일 정도의 최소 벌어짐만 요구
 
-  // (예전엔 손끝이 화면 상위 60% 안에 있어야 하는 nearHead 조건이 있었으나 제거함.
-  //  화면 절대좌표 기준이라 사람이 프레임 어디에 잡히느냐에 따라 같은 동작이
-  //  통과/탈락이 갈렸음. 얼굴 좌표를 실제로 감지하지 않는 이상 "머리 근처"를
-  //  화면 위치로 추정할 수 없고, 손을 뒤집는 wristAboveFingers 조건이 이미
-  //  이 포즈의 방향 특징을 충분히 구분해준다.)
+  // 얼굴 랜드마크를 감지하지 않으므로 화면 상단 같은 절대 위치 조건은 두지 않는다.
+  // 대신 V 중심의 아래방향만 일반 브이와 구분하는 최소 보조 조건으로 사용한다.
 
-  return ringCurl && pinkyCurl && indexStraight && middleStraight && wristAboveFingers && angleOk;
+  if (DEBUG_POSE) {
+    window.__poseDebug =
+      `고양이귀 · V각도(12도 초과): ${angleDeg.toFixed(0)}도` +
+      ` · 검지/중지 각도(110도 초과): ${indexAngle.toFixed(0)} / ${middleAngle.toFixed(0)}` +
+      ` · V중심 아래방향비(0.1 초과): ${downwardRatio.toFixed(2)}` +
+      ` · 약지/소지 접힘: ${ringCurl ? 'O' : 'X'} / ${pinkyCurl ? 'O' : 'X'}`;
+  }
+  return angleOk && indexUsable && middleUsable && pointsDown && ringCurl && pinkyCurl;
 }
 
 // 볼하트: 엄지와 검지를 붙이지 않고, 살짝 구부려 반쪽 하트(둥근 곡선) 모양을 만들어
@@ -1113,12 +1121,11 @@ function makePairChecker(pairFn, label) {
 }
 
 // 볼하트 최종 판정: 감지된 모든 손이 볼하트 모양이어야 하고, 추가로 그중 두
-// 손이 양손하트 판별(bigHeartPair)까지 동시에 통과하면 탈락시킨다.
+// 손의 검지 끝과 엄지 끝이 각각 맞붙어 양손하트의 두 접점을 만들면 탈락시킨다.
 // 양손하트의 각 손이 곧 "살짝 굽힌 반쪽 하트"라서 손 하나씩만 보면 볼하트와
 // 구분되지 않아, 양손하트 자세가 볼하트로도 오인식되는 문제가 있었다.
-// (두 손 사이 거리로 거르는 방식도 시도했으나 정당한 양손 볼하트와 양손하트의
-// 간격이 겹쳐서 문턱을 어디에 둬도 오판이 생김 → 기존 양손하트 판별 재사용이
-// 가장 단순하고 정확하다.)
+// 손 중심 거리는 쓰지 않으므로, 정상 양손 볼하트가 서로를 향하고 있어도 손끝이
+// 실제로 떨어져 있으면 통과한다.
 function cheekHeartChecker(hands, handednesses) {
   if (hands.length < 1) return false;
   // 손이 여러 개일 때 마지막 손의 디버그만 남으면 "어느 손이 왜 떨어졌는지"가
@@ -1135,20 +1142,41 @@ function cheekHeartChecker(hands, handednesses) {
   const perHandDebug = DEBUG_POSE ? debugs.join(' ‖ ') : null;
   if (DEBUG_POSE) window.__poseDebug = perHandDebug;
   if (!lastPairPerHandOk.every(Boolean)) return false;
+  // 양손하트는 양쪽 검지 끝(윗골)과 엄지 끝(아랫점)이 동시에 가까워진다.
+  // 손 중심 간격으로 거르면 손을 옆으로 기울였을 때 기준 길이가 짧아져, 충분히
+  // 떨어진 정상 양손 볼하트도 탈락할 수 있다. 그래서 중심 거리는 판정에 쓰지 않고
+  // 두 접점의 간격만 본다. bigHeartPair의 0.22보다 넉넉한 0.38을 써서 랜드마크가
+  // 조금 흔들린 양손하트도 막되, 두 손이 실제로 떨어져 있으면 통과시킨다.
+  const CHEEK_JOINED_TIP_GAP = 0.38;
+  let pairInfo = null; // 디버그용: 두 접점이 가장 가까운 쌍의 정보
   for (let i = 0; i < hands.length; i++) {
     for (let j = i + 1; j < hands.length; j++) {
-      if (bigHeartPair(hands[i], hands[j])) {
+      const scale = (handSpan2D(hands[i]) + handSpan2D(hands[j])) / 2 || 0.001;
+      const indexGap = dist(hands[i][8], hands[j][8]) / scale;
+      const thumbGap = dist(hands[i][4], hands[j][4]) / scale;
+      const joined = indexGap < CHEEK_JOINED_TIP_GAP && thumbGap < CHEEK_JOINED_TIP_GAP;
+      const pairScore = Math.max(indexGap, thumbGap);
+      if (!pairInfo || pairScore < pairInfo.score) {
+        pairInfo = { score: pairScore, indexGap, thumbGap, joined };
+      }
+      if (joined) {
         lastPairPerHandOk[i] = false;
         lastPairPerHandOk[j] = false;
         if (DEBUG_POSE) {
-          window.__poseDebug = `볼하트 · 손${i + 1}·손${j + 1}이 양손하트 판별을 동시에 통과 → 볼하트로 인정 안 함`;
+          window.__poseDebug =
+            `볼하트 · 양손 접점 간격(각각 ${CHEEK_JOINED_TIP_GAP} 이상 필요)` +
+            `: 검지 ${indexGap.toFixed(2)} / 엄지 ${thumbGap.toFixed(2)}` +
+            ' → 붙여 만든 양손하트로 보고 인정 안 함';
         }
         return false;
       }
     }
   }
-  // bigHeartPair가 남긴 양손하트 디버그 대신 손별 볼하트 디버그를 복원한다.
-  if (DEBUG_POSE) window.__poseDebug = perHandDebug;
+  if (DEBUG_POSE && pairInfo) {
+    window.__poseDebug = perHandDebug +
+      ` ‖ 최근접 두 손 접점: 검지 ${pairInfo.indexGap.toFixed(2)} / 엄지 ${pairInfo.thumbGap.toFixed(2)}` +
+      ` (둘 다 ${CHEEK_JOINED_TIP_GAP} 미만이면 탈락)`;
+  }
   return true;
 }
 

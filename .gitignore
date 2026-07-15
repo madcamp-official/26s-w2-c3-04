@@ -4,3 +4,5 @@
 ai4cut/.env
 test/.env
 test/node_modules
+figma_ui/node_modules/
+figma_ui/dist/

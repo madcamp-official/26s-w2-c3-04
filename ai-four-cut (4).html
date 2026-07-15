@@ -179,13 +179,16 @@ import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@m
 // ---------- 설정 ----------
 const GESTURES = [
   { id: 'v', name: '브이 ✌️', minHands: 1 },
-  { id: 'heart', name: '손하트 🤏', minHands: 1 },
   { id: 'thumbsup', name: '엄지척 👍', minHands: 1 },
   { id: 'tigerclaw', name: '어흥 🐯', minHands: 1 },
   { id: 'catears', name: '고양이 귀 🐱', minHands: 1 },
   { id: 'cheekheart', name: '볼하트 💕', minHands: 1 },
-  { id: 'bigheart', name: '큰하트 (양손) 💗', minHands: 2 },
+  { id: 'bigheart', name: '양손하트 🫶', minHands: 2 },
   { id: 'flower', name: '꽃받침 🌸', minHands: 1 },
+  { id: 'mouthpose', name: '숭이포즈 ☝️', minHands: 1 },
+  { id: 'yahoo', name: '야호포즈 🙌', minHands: 1 },
+  { id: 'palmpose', name: '놀라는 포즈 🖐️', minHands: 1 },
+  { id: 'rocknroll', name: '락앤롤 포즈 🤟', minHands: 1 },
 ];
 
 // 매 실행마다 6개 중 4개를 랜덤으로 뽑아서 진행 (재미 요소 + 매번 다른 조합)
@@ -206,7 +209,6 @@ chosenGestures.forEach(g => {
   sequence.push({ ...g, round: 2 });
 });
 
-const HOLD_FRAMES_REQUIRED = 12;   // 약 0.4~0.5초 연속 인식되어야 카운트다운 시작
 const COUNTDOWN_MS = 3000;
 const RESET_GAP_MS = 1200;         // 촬영 후 다음 동작 준비 텀
 
@@ -217,7 +219,6 @@ let overlay = document.getElementById('overlay');
 let octx = overlay.getContext('2d');
 
 let currentIdx = 0;
-let holdFrames = 0;
 let countdownStartTs = null;
 let inResetGap = false;
 let capturedPhotos = []; // { dataUrl, gestureName }
@@ -235,12 +236,15 @@ const errorBox = document.getElementById('errorBox');
 const GUIDE_CAPTION = {
   v: '검지·중지를 펴서 브이 모양',
   thumbsup: '엄지만 세우고 나머지 손가락은 접기',
-  heart: '엄지와 검지 끝을 붙여 하트 모양',
   tigerclaw: '손바닥이 보이게 들고, 손톱이 보일 정도로만 손가락을 살짝 구부리기',
-  catears: '검지·중지를 60도 정도 벌려 머리 위쪽에 대기 (한 손 OK)',
-  cheekheart: '엄지·검지 끝을 붙여 볼 옆에 하트 (한 손 OK)',
-  bigheart: '양손 검지 끝을 머리 위에서 맞대어 큰 하트 만들기',
+  catears: '손목을 머리 위로 들고 손등이 보이게, 검지·중지를 벌려 손톱이 머리에 닿도록 굽히기 (한 손 OK)',
+  cheekheart: '한손으로 반쪽 하트를 만들어 볼 옆에 대기 (한 손 OK)',
+  bigheart: '양손을 둥글게 구부려 검지 끝은 위에서, 엄지 끝은 아래에서 맞닿게 하트 만들기',
   flower: '손가락을 붙여 펴고 턱 밑에 대기 (한 손 OK)',
+  mouthpose: '검지손가락을 입꼬리 끝에 대기 (살짝 깨무는 느낌도 OK)',
+  yahoo: '브이를 뒤집어서 손톱이 바닥을 향하게',
+  palmpose: '손등이 보이게, 손가락을 사이사이 틈이 보이도록 쫙 펼치기 (한 손 OK)',
+  rocknroll: '엄지·검지·새끼손가락은 펴고, 중지·약지는 완전히 접기',
 };
 
 function log(msg) {
@@ -273,7 +277,7 @@ async function init() {
       delegate: "GPU"
     },
     runningMode: "VIDEO",
-    numHands: 6   // 여럿이 함께 찍을 때 대비 (최대 3명 x 양손)
+    numHands: 8   // 여럿이 함께 찍을 때 대비 (최대 4명 x 양손)
   });
 
   log('모델 로드 완료, 인식 시작');
@@ -296,6 +300,41 @@ function isFingerCurled(lm, tipIdx, pipIdx) {
 function wristDist(lm, idx) {
   return dist(lm[idx], lm[0]);
 }
+// 손목 대비 손끝 거리 "비율"로 굽힘 정도를 판정 (절대 좌표 차이가 아니라 비율이라
+// 카메라와의 거리(확대/축소)나 손이 살짝 돌아간 각도에도 흔들리지 않고 비교적 안정적임)
+function isFingerFolded(lm, tipIdx, mcpIdx) {
+  return wristDist(lm, tipIdx) < wristDist(lm, mcpIdx) * 1.35;
+}
+// 관절(중간 마디, pipIdx)을 꼭짓점으로 mcp-pip-tip 세 점이 이루는 각도.
+// 손가락이 곧게 펴져 있으면 180도에 가깝고, 굽을수록 작아진다. y좌표 비교와 달리
+// 팔/손이 화면에서 어떤 각도로 기울어(대각선으로 들어올린 경우 등) 있어도 값이 흔들리지 않는다.
+function fingerBendAngle(lm, mcpIdx, pipIdx, tipIdx) {
+  const v1 = { x: lm[mcpIdx].x - lm[pipIdx].x, y: lm[mcpIdx].y - lm[pipIdx].y };
+  const v2 = { x: lm[tipIdx].x - lm[pipIdx].x, y: lm[tipIdx].y - lm[pipIdx].y };
+  const m1 = Math.hypot(v1.x, v1.y), m2 = Math.hypot(v2.x, v2.y);
+  const cosA = (v1.x * v2.x + v1.y * v2.y) / (m1 * m2 || 1);
+  return Math.acos(Math.min(1, Math.max(-1, cosA))) * 180 / Math.PI;
+}
+// 손목 기준 거리 "비율"로 손가락 펴짐/구부림을 판정 (손이 기울어지거나 회전해도 안정적으로 동작)
+function curlRatio(lm, tipIdx, mcpIdx) {
+  return wristDist(lm, tipIdx) / (wristDist(lm, mcpIdx) || 1);
+}
+
+// 손등/손바닥 방향 판정: 손목(0)->검지뿌리(5), 손목(0)->새끼뿌리(17) 두 벡터의
+// 2D 외적(z성분) 부호가 손이 뒤집히면(=손등/손바닥이 바뀌면) 반전되는 성질을 이용.
+// 실제 테스트 결과 손바닥이 보일 때 통과되는 반대 증상이 있어(카메라에 넘기는 원본 프레임이
+// 화면에 보이는 거울 모드와 좌우가 반대라 handedness 라벨 기준이 뒤집혀 있었음)
+// FLIP_HAND_ORIENTATION을 true로 두어 부호를 반전시킴.
+const FLIP_HAND_ORIENTATION = true;
+function isBackOfHandFacing(lm, handednessLabel) {
+  const wrist = lm[0], idx = lm[5], pinky = lm[17];
+  const v1x = idx.x - wrist.x, v1y = idx.y - wrist.y;
+  const v2x = pinky.x - wrist.x, v2y = pinky.y - wrist.y;
+  const crossZ = v1x * v2y - v1y * v2x;
+  let backFacing = handednessLabel === 'Right' ? crossZ < 0 : crossZ > 0;
+  if (FLIP_HAND_ORIENTATION) backFacing = !backFacing;
+  return backFacing;
+}
 
 function vComponent(lm) {
   const indexExt = isFingerExtended(lm, 8, 6);
@@ -314,14 +353,6 @@ function thumbsUpComponent(lm) {
   return indexCurl && middleCurl && ringCurl && pinkyCurl && thumbUp;
 }
 
-function fingerHeartComponent(lm) {
-  const pinchDist = dist(lm[4], lm[8]);
-  const middleCurl = isFingerCurled(lm, 12, 10);
-  const ringCurl = isFingerCurled(lm, 16, 14);
-  const pinkyCurl = isFingerCurled(lm, 20, 18);
-  return pinchDist < 0.06 && middleCurl && ringCurl && pinkyCurl;
-}
-
 // 어흥(호랑이 발톱): 손바닥이 보이도록 들고, 손톱이 보이는 정도로만 살짝 구부린 상태
 // (기존엔 거의 주먹 수준으로 구부려야 인식돼서, 살짝만 구부려도 인식되도록 범위를 완화함)
 function tigerClawComponent(lm) {
@@ -334,31 +365,53 @@ function tigerClawComponent(lm) {
   });
 }
 
-// 고양이 귀: 검지·중지를 약 60도 각도로 벌려 머리 위쪽에 대는 모양 (한 손 가능)
+// 고양이 귀: 검지·중지를 곧게 편 채로 넓게 벌려서(V보다 더 벌어진 삼각형 모양), 손목이
+// 손끝보다 위(더 높은 곳)에 있도록 손을 뒤집어(손등이 보이게) 손끝이 머리에 닿는 모양.
+// (직전 버전은 손목-손끝 위아래 관계를 안 봐서, 손가락이 위로 향한 일반 브이 사인도
+//  똑같이 통과돼버렸음. "손목이 손끝보다 위에 있는지"만 다시 검사해서 방향을 구분함 -
+//  손목/손끝 두 점만 비교하므로, 팔 전체가 대각선으로 들려도 흔들리지 않음)
 function catEarsComponent(lm) {
-  const indexExt = isFingerExtended(lm, 8, 6);
-  const middleExt = isFingerExtended(lm, 12, 10);
-  if (!indexExt || !middleExt) return false;
-  const ringCurl = isFingerCurled(lm, 16, 14);
-  const pinkyCurl = isFingerCurled(lm, 20, 18);
+  // 검지·중지가 곧게 펴져 있는지 (완전히 편 손가락은 관절 각도가 180도에 가까움)
+  const indexStraight = fingerBendAngle(lm, 5, 6, 8) > 140;
+  const middleStraight = fingerBendAngle(lm, 9, 10, 12) > 140;
+  if (!indexStraight || !middleStraight) return false;
 
-  // 검지(5->8)와 중지(9->12) 방향 벡터 사이의 각도 계산
-  const v1 = { x: lm[8].x - lm[5].x, y: lm[8].y - lm[5].y };
-  const v2 = { x: lm[12].x - lm[9].x, y: lm[12].y - lm[9].y };
+  // 약지·소지는 주먹처럼 접혀야 함 (관절 각도 기준, 회전에 영향받지 않음)
+  const ringCurl = fingerBendAngle(lm, 13, 14, 16) < 140;
+  const pinkyCurl = fingerBendAngle(lm, 17, 18, 20) < 140;
+
+  // 손목(0)이 검지·중지 손끝보다 위(작은 y)에 있어야 함 = 손등 쪽이 위, 손끝이 머리 쪽 아래
+  // (일반 브이 사인처럼 손가락이 손목보다 위로 향하면 이 조건에서 걸러짐)
+  const wristAboveFingers = lm[0].y < lm[8].y && lm[0].y < lm[12].y;
+
+  // 손목(0)을 꼭짓점으로 검지 끝(8)·중지 끝(12)까지의 벌어진 각도
+  const v1 = { x: lm[8].x - lm[0].x, y: lm[8].y - lm[0].y };
+  const v2 = { x: lm[12].x - lm[0].x, y: lm[12].y - lm[0].y };
   const mag1 = Math.hypot(v1.x, v1.y), mag2 = Math.hypot(v2.x, v2.y);
   const cosA = (v1.x * v2.x + v1.y * v2.y) / (mag1 * mag2 || 1);
   const angleDeg = Math.acos(Math.min(1, Math.max(-1, cosA))) * 180 / Math.PI;
-  const angleOk = angleDeg > 30 && angleDeg < 85; // 60도 근방, 여유 있게
+  const angleOk = angleDeg > 10; // 브이 사인보다 넉넉히 벌어져 있으면 인정 (상한 없음)
 
-  const raised = lm[0].y < 0.55; // 손이 머리 위쪽에 위치
-  return ringCurl && pinkyCurl && angleOk && raised;
+  const nearHead = lm[8].y < 0.6 && lm[12].y < 0.6; // 손끝이 머리 높이(화면 위쪽) 부근에 위치
+
+  return ringCurl && pinkyCurl && indexStraight && middleStraight && wristAboveFingers && angleOk && nearHead;
 }
 
-// 볼하트: 엄지-검지를 붙여 하트 모양, 얼굴(볼) 높이 근처 (한 손이면 충분)
+// 볼하트: 엄지와 검지를 붙이지 않고, 살짝 구부려 반쪽 하트(둥근 곡선) 모양을 만들어
+// 볼 옆에 대는 동작. (기존엔 엄지-검지 끝을 붙이는 핀치 조건이라 사실상 손하트와
+// 똑같이 판정됐음. 붙지 않고 벌어진 채 곡선을 이루는 상태로 조건을 바꿈)
+// 얼굴 가까이서 촬영하면(=손이 화면을 크게 채우면) 절대 좌표 기준 거리는 훨씬 커지고,
+// 손이 살짝 돌아가면 y좌표 차이로 굽힘을 판정하는 방식이 흔들리기 쉬움. 그래서 모든
+// 거리를 "손 크기(손목~중지 마디)" 대비 비율로 계산해 카메라 거리·각도 변화에 안정적으로 만듦.
 function cheekHeartComponent(lm) {
-  const pinchOk = dist(lm[4], lm[8]) < 0.09;
-  const upperArea = lm[8].y < 0.65;
-  return pinchOk && upperArea;
+  const handScale = wristDist(lm, 9) || 0.001;
+  const middleFolded = isFingerFolded(lm, 12, 9);
+  const ringFolded = isFingerFolded(lm, 16, 13);
+  const pinkyFolded = isFingerFolded(lm, 20, 17);
+  const gapRatio = dist(lm[4], lm[8]) / handScale;
+  const gapOk = gapRatio > 0.15 && gapRatio < 1.5; // 완전히 붙지도(핀치), 너무 벌어지지도 않게
+  const upperArea = lm[8].y < 0.8; // 얼굴~볼 높이 부근 (가까이 촬영해도 되도록 여유 있게)
+  return middleFolded && ringFolded && pinkyFolded && gapOk && upperArea;
 }
 
 // 꽃받침: 손가락을 붙여서 펴고, 턱 밑 높이에 대는 모양 (한 손)
@@ -369,38 +422,93 @@ function flowerComponent(lm) {
   return allExt && closeGaps && nearFace;
 }
 
+// 숭이포즈: 검지손가락 끝이 입꼬리(입 주변) 높이에 있으면 인정.
+// 손톱쪽을 깨물듯 살짝 구부려도, 그냥 붙여도 되므로 검지 자체의 펴짐/구부림은 따지지 않음.
+function mouthPoseComponent(lm) {
+  const middleCurl = curlRatio(lm, 12, 9) < 1.1;
+  const ringCurl = curlRatio(lm, 16, 13) < 1.1;
+  const pinkyCurl = curlRatio(lm, 20, 17) < 1.1;
+  const indexNearMouth = lm[8].y > 0.3 && lm[8].y < 0.78; // 입 주변 높이 범위
+  return middleCurl && ringCurl && pinkyCurl && indexNearMouth;
+}
+
+// 야호포즈: 브이를 뒤집은 모양. 검지·중지가 펴진 채로 "뿌리보다 아래쪽"을 향해야 함(손톱이 바닥 방향)
+function yahooComponent(lm) {
+  const indexExtended = curlRatio(lm, 8, 5) > 1.15;
+  const middleExtended = curlRatio(lm, 12, 9) > 1.15;
+  const pointingDown = (lm[8].y - lm[5].y) > 0.03 && (lm[12].y - lm[9].y) > 0.03;
+  const ringCurl = curlRatio(lm, 16, 13) < 1.05;
+  const pinkyCurl = curlRatio(lm, 20, 17) < 1.05;
+  return indexExtended && middleExtended && pointingDown && ringCurl && pinkyCurl;
+}
+
+// 놀라는 포즈(id: palmpose): 손등이 카메라를 향하고, 엄지 포함 5손가락이 모두 펴져서
+// 서로 붙지 않고 사이사이 틈이 벌어져 있어야 함. 두 손 중 한 손만 이 모양이어도 인정.
+function palmPoseHandComponent(lm, handedness) {
+  const fourExtended = [[8, 5], [12, 9], [16, 13], [20, 17]]
+    .every(([tip, mcp]) => curlRatio(lm, tip, mcp) > 1.15);
+  const thumbExtended = curlRatio(lm, 4, 2) > 1.15;
+  const palmWidth = dist(lm[5], lm[17]) || 1; // 손 크기로 정규화
+  const gaps = [dist(lm[4], lm[8]), dist(lm[8], lm[12]), dist(lm[12], lm[16]), dist(lm[16], lm[20])];
+  const spread = gaps.every(g => (g / palmWidth) > 0.35); // 손가락 사이 틈이 충분히 벌어져야 함
+  const backFacing = isBackOfHandFacing(lm, handedness);
+  return fourExtended && thumbExtended && spread && backFacing;
+}
+
+// 락앤롤 포즈 🤟: 엄지·검지·새끼는 펴고, 중지·약지는 완전히 접기
+function rockAndRollComponent(lm) {
+  const indexExtended = curlRatio(lm, 8, 5) > 1.15;
+  const pinkyExtended = curlRatio(lm, 20, 17) > 1.15;
+  const thumbExtended = curlRatio(lm, 4, 2) > 1.15;
+  const middleCurl = curlRatio(lm, 12, 9) < 1.05;
+  const ringCurl = curlRatio(lm, 16, 13) < 1.05;
+  return indexExtended && pinkyExtended && thumbExtended && middleCurl && ringCurl;
+}
+
 const COMPONENTS = {
   v: vComponent,
   thumbsup: thumbsUpComponent,
-  heart: fingerHeartComponent,
   tigerclaw: tigerClawComponent,
   catears: catEarsComponent,
   cheekheart: cheekHeartComponent,
   flower: flowerComponent,
+  mouthpose: mouthPoseComponent,
+  yahoo: yahooComponent,
+  palmpose: palmPoseHandComponent,
+  rocknroll: rockAndRollComponent,
 };
 
-// 화면에 감지된 손이 몇 개든(=몇 명이든) 전부 만족해야 인정
+// 화면에 감지된 손이 몇 개든(=몇 명이든) 전부 만족해야 인정.
+// handedness(왼손/오른손)가 필요한 컴포넌트(손바닥 포즈 등)에도 쓸 수 있도록 함께 전달.
 function makeChecker(gestureId, minHands) {
   const component = COMPONENTS[gestureId];
-  return function (hands) {
+  return function (hands, handednesses) {
     if (hands.length < minHands) return false;
-    return hands.every(lm => component(lm));
+    return hands.every((lm, i) => component(lm, handednesses ? handednesses[i] : undefined));
   };
 }
 
-// 큰하트(양손 결합): 두 손의 검지 끝을 머리 위에서 맞대어 하나의 하트를 만드는 동작.
+// 양손하트(양손 결합): 주먹을 맞대는 게 아니라, 양손을 둥글게 구부려
+// 검지 끝(하트 윗부분 골)과 엄지 끝(하트 아랫부분 뾰족한 점)이 각각 서로 맞닿도록
+// 만드는 동작.
 // 다른 제스처와 달리 "손끼리의 관계"를 봐야 해서 별도 로직으로 처리.
 function bigHeartChecker(hands) {
   if (hands.length !== 2) return false; // 정확히 두 손일 때만 판정 (양손 or 두 사람이 손을 맞댈 때)
   const [a, b] = hands;
-  const tipsClose = dist(a[8], b[8]) < 0.12;
-  const raised = a[0].y < 0.5 && b[0].y < 0.5;
-  return tipsClose && raised;
+  const indexTipsClose = dist(a[8], b[8]) < 0.12; // 검지 끝끼리 맞닿음 (하트 윗부분 골)
+  const thumbTipsClose = dist(a[4], b[4]) < 0.12; // 엄지 끝끼리 맞닿음 (하트 아랫부분 꼭짓점)
+  // 검지가 엄지보다 위에 있어야 함 (손을 뒤집어서 맞대는 등의 오검출 방지)
+  const orientedUp = a[8].y < a[4].y && b[8].y < b[4].y;
+  return indexTipsClose && thumbTipsClose && orientedUp;
 }
+
+const SPECIAL_CHECKERS = {
+  bigheart: bigHeartChecker,
+};
 
 const CHECKERS = {};
 GESTURES.forEach(g => {
-  CHECKERS[g.id] = g.id === 'bigheart' ? bigHeartChecker : makeChecker(g.id, g.minHands);
+  CHECKERS[g.id] = SPECIAL_CHECKERS[g.id] || makeChecker(g.id, g.minHands);
 });
 
 // ---------- 메인 루프 ----------
@@ -412,8 +520,10 @@ function loop() {
     lastVideoTime = video.currentTime;
     const result = handLandmarker.detectForVideo(video, performance.now());
     const hands = result.landmarks || [];
+    // 손등/손바닥 방향 판정에 필요한 왼손/오른손 라벨 추출 (손바닥 포즈에서 사용)
+    const handednesses = (result.handednesses || []).map(h => (h && h[0] && h[0].categoryName) || 'Right');
     const gestureDef = sequence[currentIdx];
-    const ok = !inResetGap && CHECKERS[gestureDef.id](hands);
+    const ok = !inResetGap && CHECKERS[gestureDef.id](hands, handednesses);
     drawOverlay(result, ok);
 
     if (!inResetGap) {
@@ -443,7 +553,6 @@ function handleDetection(ok, handCount, minHands) {
     if (!ok) {
       // 자세 풀림 -> 카운트다운 취소
       countdownStartTs = null;
-      holdFrames = 0;
       countdownNumEl.textContent = '';
       subStatusEl.innerHTML = `<span class="hint-wait">자세가 풀렸어요. 모든 사람이 다시 동작을 만들어주세요${countInfo}</span>`;
       return;
@@ -460,13 +569,9 @@ function handleDetection(ok, handCount, minHands) {
   }
 
   if (ok) {
-    holdFrames++;
-    subStatusEl.innerHTML = `<span class="hint-hold">전원 인식됨! 유지해주세요 (${Math.min(holdFrames, HOLD_FRAMES_REQUIRED)}/${HOLD_FRAMES_REQUIRED})</span>`;
-    if (holdFrames >= HOLD_FRAMES_REQUIRED) {
-      countdownStartTs = performance.now();
-    }
+    // 동작이 인식되는 즉시 바로 촬영 카운트다운 시작 (기다리는 시간 없이 바로 진행)
+    countdownStartTs = performance.now();
   } else {
-    holdFrames = 0;
     const needMsg = minHands > 1 ? ` (최소 ${minHands}개 손 필요)` : '';
     subStatusEl.innerHTML = `<span class="hint-wait">동작을 인식하는 중...${needMsg}${countInfo}</span>`;
   }
@@ -487,7 +592,6 @@ function capturePhoto() {
   log(`촬영 완료: ${gestureDef.name} (${gestureDef.round}/2) [${capturedPhotos.length}/8]`);
 
   countdownStartTs = null;
-  holdFrames = 0;
   countdownNumEl.textContent = '';
   currentIdx++;
 

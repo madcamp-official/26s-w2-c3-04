@@ -691,7 +691,11 @@ function catEarsComponent(lm) {
 // 하한만 두면(이전 0.05) 손바닥을 정면으로 활짝 돌린 부자연스러운 자세는
 // 무제한 통과하고, 반대로 손이 조금만 돌아가면 바로 탈락하는 비대칭이 생김.
 // -> 살짝 돌아간 것(음수 소폭)은 허용하고, 정면으로 활짝 편 것(큰 양수)은 거른다.
-const CHEEK_PALM_FACING_MIN = -0.25;
+// 범위를 대칭(-0.5~0.5)으로 둔다: 이 점수는 왼손/오른손 라벨에 의존하는데,
+// 거울 모드에서 라벨이 틀리면 부호가 뒤집힌다. 비대칭 범위(-0.25~0.5)일 땐
+// 대칭인 양손 볼하트에서 한 손만 부호가 뒤집혀 탈락하는 증상이 있었다.
+// 대칭 범위면 부호가 뒤집혀도 판정이 같아져 라벨 오류에 면역이 된다.
+const CHEEK_PALM_FACING_MIN = -0.5;
 const CHEEK_PALM_FACING_MAX = 0.5;
 
 function cheekHeartComponent(lm, handednessLabel) {
@@ -1108,8 +1112,49 @@ function makePairChecker(pairFn, label) {
   };
 }
 
+// 볼하트 최종 판정: 감지된 모든 손이 볼하트 모양이어야 하고, 추가로 그중 두
+// 손이 양손하트 판별(bigHeartPair)까지 동시에 통과하면 탈락시킨다.
+// 양손하트의 각 손이 곧 "살짝 굽힌 반쪽 하트"라서 손 하나씩만 보면 볼하트와
+// 구분되지 않아, 양손하트 자세가 볼하트로도 오인식되는 문제가 있었다.
+// (두 손 사이 거리로 거르는 방식도 시도했으나 정당한 양손 볼하트와 양손하트의
+// 간격이 겹쳐서 문턱을 어디에 둬도 오판이 생김 → 기존 양손하트 판별 재사용이
+// 가장 단순하고 정확하다.)
+function cheekHeartChecker(hands, handednesses) {
+  if (hands.length < 1) return false;
+  // 손이 여러 개일 때 마지막 손의 디버그만 남으면 "어느 손이 왜 떨어졌는지"가
+  // 안 보이므로, 손마다 판정 결과와 내부 값을 모아서 한 줄로 합쳐 남긴다.
+  const debugs = [];
+  lastPairPerHandOk = hands.map((lm, i) => {
+    const ok = cheekHeartComponent(lm, handednesses ? handednesses[i] : undefined);
+    if (DEBUG_POSE && window.__poseDebug) {
+      debugs.push(`[손${i + 1} ${ok ? 'O' : 'X'}] ${window.__poseDebug}`);
+      window.__poseDebug = null;
+    }
+    return ok;
+  });
+  const perHandDebug = DEBUG_POSE ? debugs.join(' ‖ ') : null;
+  if (DEBUG_POSE) window.__poseDebug = perHandDebug;
+  if (!lastPairPerHandOk.every(Boolean)) return false;
+  for (let i = 0; i < hands.length; i++) {
+    for (let j = i + 1; j < hands.length; j++) {
+      if (bigHeartPair(hands[i], hands[j])) {
+        lastPairPerHandOk[i] = false;
+        lastPairPerHandOk[j] = false;
+        if (DEBUG_POSE) {
+          window.__poseDebug = `볼하트 · 손${i + 1}·손${j + 1}이 양손하트 판별을 동시에 통과 → 볼하트로 인정 안 함`;
+        }
+        return false;
+      }
+    }
+  }
+  // bigHeartPair가 남긴 양손하트 디버그 대신 손별 볼하트 디버그를 복원한다.
+  if (DEBUG_POSE) window.__poseDebug = perHandDebug;
+  return true;
+}
+
 const SPECIAL_CHECKERS = {
   bigheart: makePairChecker(bigHeartPair, '양손하트'),
+  cheekheart: cheekHeartChecker,
 };
 
 const CHECKERS = {};

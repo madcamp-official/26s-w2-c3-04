@@ -247,24 +247,6 @@
   </div>
 
   <div class="status-bar" id="statusBar">
-    <div class="row" style="justify-content:center; margin-bottom:10px;">
-      <select id="testGestureSelect" aria-label="테스트할 포즈 선택" style="max-width:220px;">
-        <option value="">테스트할 포즈 선택</option>
-        <option value="v">브이 ✌️</option>
-        <option value="thumbsup">엄지척 👍</option>
-        <option value="tigerclaw">어흥 🐯</option>
-        <option value="catears">고양이 귀 🐱</option>
-        <option value="cheekheart">볼하트 💕</option>
-        <option value="bigheart">양손하트 🫶</option>
-        <option value="flower">꽃받침 🌸</option>
-        <option value="mouthpose">숭이포즈 ☝️</option>
-        <option value="yahoo">야호포즈 🙌</option>
-        <option value="palmpose">놀라는 포즈 🖐️</option>
-        <option value="rocknroll">락앤롤 포즈 🤟</option>
-      </select>
-      <button type="button" id="applyTestGestureBtn">선택 포즈만 테스트</button>
-      <button type="button" class="btn-secondary" id="randomGestureModeBtn">일반 모드</button>
-    </div>
     <div class="progress" id="progressText">준비 중...</div>
     <div class="gesture-name" id="gestureName">-</div>
     <div class="guide-caption" id="guideCaption"></div>
@@ -381,23 +363,14 @@ function shuffle(arr) {
   }
   return a;
 }
-const testGestureId = new URLSearchParams(window.location.search).get('testGesture');
-const testGesture = GESTURES.find(g => g.id === testGestureId) || null;
-const isGestureTestMode = testGesture !== null;
-const chosenGestures = isGestureTestMode ? [testGesture] : shuffle(GESTURES).slice(0, 4);
+const chosenGestures = shuffle(GESTURES).slice(0, 4);
 
-// 일반 모드는 각 제스처를 2번씩, 테스트 모드는 선택한 한 제스처를 8번 반복한다.
+// 뽑힌 각 제스처를 2번씩 촬영한다 (총 8장).
 const sequence = [];
-if (isGestureTestMode) {
-  for (let round = 1; round <= 8; round++) {
-    sequence.push({ ...testGesture, round });
-  }
-} else {
-  chosenGestures.forEach(g => {
-    sequence.push({ ...g, round: 1 });
-    sequence.push({ ...g, round: 2 });
-  });
-}
+chosenGestures.forEach(g => {
+  sequence.push({ ...g, round: 1 });
+  sequence.push({ ...g, round: 2 });
+});
 
 const COUNTDOWN_MS = 3000;
 const RESET_GAP_MS = 1200;         // 촬영 후 다음 동작 준비 텀
@@ -407,6 +380,10 @@ const DETECTION_REQUIRED_HITS = 8; // 10프레임 중 8프레임 이상 성공�
 // 프레임 단위 실패가 잦음)는 6프레임 성공으로 완화해서 인정한다.
 const RELAXED_DETECTION_REQUIRED_HITS = 6;
 const FAILURE_GRACE_MS = 400;      // 순간적인 인식 실패는 400ms까지 허용
+
+// 개발자용 디버그 플래그. true로 켜면 각 판정 함수의 내부 값(간격비·각도·점수)이
+// 0.5초마다 화면 로그에 출력돼 문턱값 튜닝에 쓸 수 있다. 배포 시엔 false로 둔다.
+const DEBUG_POSE = false;
 
 // ---------- 상태 ----------
 let handLandmarker = null;
@@ -429,23 +406,6 @@ const progressTextEl = document.getElementById('progressText');
 const countdownNumEl = document.getElementById('countdownNum');
 const logArea = document.getElementById('logArea');
 const errorBox = document.getElementById('errorBox');
-const testGestureSelect = document.getElementById('testGestureSelect');
-
-testGestureSelect.value = testGesture ? testGesture.id : '';
-document.getElementById('applyTestGestureBtn').addEventListener('click', () => {
-  if (!testGestureSelect.value) {
-    subStatusEl.textContent = '먼저 테스트할 포즈를 선택해주세요';
-    return;
-  }
-  const url = new URL(window.location.href);
-  url.searchParams.set('testGesture', testGestureSelect.value);
-  window.location.href = url.toString();
-});
-document.getElementById('randomGestureModeBtn').addEventListener('click', () => {
-  const url = new URL(window.location.href);
-  url.searchParams.delete('testGesture');
-  window.location.href = url.toString();
-});
 
 // 동작별 설명 문구 (일러스트 없이 텍스트로만 안내)
 const GUIDE_CAPTION = {
@@ -742,7 +702,7 @@ function cheekHeartComponent(lm, handednessLabel) {
   const gapRatio = dist(lm[4], lm[8]) / handScale;
   const gapOk = gapRatio > 0.15 && gapRatio < 1.5; // 완전히 붙지도(핀치), 너무 벌어지지도 않게
   // 테스트 모드에서 어떤 조건이 실패하는지 실시간 확인용 (loop에서 스로틀 출력)
-  if (isGestureTestMode) {
+  if (DEBUG_POSE) {
     const a = (mcp, pip, tip) => fingerBendAngle3D(lm, mcp, pip, tip).toFixed(0);
     const r = (t, m) => curlRatio(lm, t, m).toFixed(2);
     window.__poseDebug =
@@ -817,7 +777,7 @@ function flowerComponent(lm, handedness) {
   // -0.25까지는 허용해 "손등이 살짝 보이는" 각도는 통과시킨다.
   const palmScore = palmFacingScore(lm, handedness);
   const notBackFacing = palmScore > -0.25;
-  if (isGestureTestMode) {
+  if (DEBUG_POSE) {
     window.__poseDebug =
       `꽃받침 · 관절각 평균(125 초과 필요): ${avgAngle.toFixed(0)}` +
       ` (검지 ${angIdx.toFixed(0)} 중지 ${angMid.toFixed(0)} 약지 ${angRing.toFixed(0)} 소지 ${angPinky.toFixed(0)})` +
@@ -893,7 +853,7 @@ function yahooComponent(lm, _handedness, worldLm) {
   const fallbackOk = palmPointsDown && fallbackExtendedOk && fallbackFoldedOk;
   const preciseOk = extendedOk && pointingDown && foldedOk;
 
-  if (isGestureTestMode) {
+  if (DEBUG_POSE) {
     window.__poseDebug =
       `야호 · 편 손가락 월드각도(각 120 초과, 평균 135 초과): ${indexAngle.toFixed(0)} / ${middleAngle.toFixed(0)}` +
       ` · 아래방향비(각 -0.05 초과, 평균 0.1 초과): ${indexDown.toFixed(2)} / ${middleDown.toFixed(2)}` +
@@ -1039,7 +999,7 @@ function bigHeartPair(a, b) {
   // 기도 자세(뿌리까지 다 붙음)를 걸러낸다.
   const lobeGap = dist(a[5], b[5]) / scale;
   const lobesApart = lobeGap > 0.2; // 손바닥을 완전히 모아 붙인 자세만 거르는 수준
-  if (isGestureTestMode) {
+  if (DEBUG_POSE) {
     window.__poseDebug =
       `양손하트 · 검지간격비(0.22 미만): ${indexGap.toFixed(2)}` +
       ` · 엄지간격비(0.22 미만): ${thumbGap.toFixed(2)}` +
@@ -1062,7 +1022,7 @@ function makePairChecker(pairFn, label) {
   return function (hands) {
     lastPairPerHandOk = hands.map(() => false);
     if (hands.length < 2 || hands.length % 2 !== 0) {
-      if (isGestureTestMode) {
+      if (DEBUG_POSE) {
         window.__poseDebug = `${label} · 감지된 손 ${hands.length}개 — 두 손씩 짝을 지을 수 없음`;
       }
       return false;
@@ -1096,13 +1056,13 @@ function makePairChecker(pairFn, label) {
       const ok = pairFn(hands[i], hands[j]);
       lastPairPerHandOk[i] = ok;
       lastPairPerHandOk[j] = ok;
-      if (isGestureTestMode && window.__poseDebug) {
+      if (DEBUG_POSE && window.__poseDebug) {
         debugs.push(window.__poseDebug);
         window.__poseDebug = null;
       }
       return ok;
     });
-    if (isGestureTestMode) {
+    if (DEBUG_POSE) {
       window.__poseDebug = pairs.length > 1
         ? `${label} ${pairs.length}쌍 판정 → ` + debugs.join(' ‖ ')
         : debugs[0] || null;
@@ -1238,10 +1198,10 @@ function loop() {
           : hands.map(() => rawOk))
       : hands.map((lm, i) => COMPONENTS[gestureDef.id](lm, handednesses[i], worldHands[i]));
     // 테스트 모드: 판정 함수가 남긴 내부 값을 0.5초마다 로그로 출력 (문턱 튜닝용)
-    if (isGestureTestMode && gestureDef.id === 'yahoo' && window.__poseDebug) {
+    if (DEBUG_POSE && gestureDef.id === 'yahoo' && window.__poseDebug) {
       window.__poseDebug += ` · 인식경로: ${usedRotation ? '회전(180도)' : '일반'}`;
     }
-    if (isGestureTestMode && window.__poseDebug && performance.now() - (window.__poseDebugTs || 0) > 500) {
+    if (DEBUG_POSE && window.__poseDebug && performance.now() - (window.__poseDebugTs || 0) > 500) {
       window.__poseDebugTs = performance.now();
       log(window.__poseDebug);
       window.__poseDebug = null;
@@ -1330,8 +1290,7 @@ function capturePhoto() {
   tctx.drawImage(video, 0, 0, tmp.width, tmp.height);
   const dataUrl = tmp.toDataURL('image/jpeg', 0.92);
   capturedPhotos.push({ dataUrl, gestureName: gestureDef.name, round: gestureDef.round });
-  const roundTotal = isGestureTestMode ? sequence.length : 2;
-  log(`촬영 완료: ${gestureDef.name} (${gestureDef.round}/${roundTotal}) [${capturedPhotos.length}/${sequence.length}]`);
+  log(`촬영 완료: ${gestureDef.name} (${gestureDef.round}/2) [${capturedPhotos.length}/${sequence.length}]`);
 
   countdownStartTs = null;
   resetDetectionStability();
@@ -1352,9 +1311,8 @@ function capturePhoto() {
 
 function showCurrentGesture() {
   const g = sequence[currentIdx];
-  const roundTotal = isGestureTestMode ? sequence.length : 2;
   gestureNameEl.textContent = g.name;
-  progressTextEl.textContent = `${isGestureTestMode ? '테스트 모드 · ' : ''}${currentIdx + 1} / ${sequence.length}번째 촬영  (${g.name.split(' ')[0]} - ${g.round}/${roundTotal}회차)`;
+  progressTextEl.textContent = `${currentIdx + 1} / ${sequence.length}번째 촬영  (${g.name.split(' ')[0]} - ${g.round}/2회차)`;
   guideCaptionEl.textContent = GUIDE_CAPTION[g.id] || '';
 }
 

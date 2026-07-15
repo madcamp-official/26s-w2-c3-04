@@ -2702,7 +2702,7 @@ async function buildUniversityStripDataUrl(size, univ) {
 
   const logoImg = await resolveUniversityLogoImage(univ);
   if (logoImg) {
-    if (univ.key === 'pusan') {
+    if (univ.key === 'pusan' || univ.key === 'kaist') {
       drawLogoWithWhiteBacking(ctx, logoImg, logoX, logoY, logoSize);
     } else {
       ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
@@ -2753,9 +2753,9 @@ async function resolveUniversityLogoImage(univ) {
   return null;
 }
 
-// 부산대 로고는 파란 선/글자 디자인이 학교색 배경(진한 파랑)에 묻혀 보이는
-// 문제가 있어서, 부산대에 한해서만 대체 배지와 같은 방식으로 흰 원을 먼저
-// 깔아준 뒤 그 위에 실제 로고를 그림(다른 학교는 원래대로 로고만 그대로 그림).
+// 부산대·카이스트 로고는 파란 선/글자 디자인이 학교색 배경(진한 파랑)에 묻혀
+// 보이는 문제가 있어서, 이 두 학교에 한해서만 대체 배지와 같은 방식으로 흰
+// 원을 먼저 깔아준 뒤 그 위에 실제 로고를 그림(다른 학교는 원래대로 로고만 그대로 그림).
 function drawLogoWithWhiteBacking(ctx, img, x, y, size) {
   ctx.save();
   ctx.beginPath();
@@ -3087,7 +3087,7 @@ async function composeGrid(images, targetCanvas = finalCanvas) {
 
     const logoImg = await resolveUniversityLogoImage(gridUniversity);
     if (logoImg) {
-      if (gridUniversity.key === 'pusan') {
+      if (gridUniversity.key === 'pusan' || gridUniversity.key === 'kaist') {
         drawLogoWithWhiteBacking(ctx, logoImg, logoX, footerCenterY - logoSize / 2, logoSize);
       } else {
         ctx.drawImage(logoImg, logoX, footerCenterY - logoSize / 2, logoSize, logoSize);

@@ -3,4 +3,6 @@
 4cut_demo/.env
 ai4cut/.env
 test/.env
-test/node_modules
+test/node_modules/
+test/univ-logos
+test/logos

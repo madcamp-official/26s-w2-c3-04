@@ -4,74 +4,96 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>StoryBooth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
+  /* Figma "Design StoryBooth UI" 팀에서 만든 디자인(figma_ui)의 색/타이포/카드
+     스타일을 이 페이지에 입힘. 촬영 화면(.stage-wrap/.status-bar/.grid8)만은
+     Figma 쪽이 세로로 너무 길고 좁아서(max-w-sm, 3:4 카드) 기존 640px 너비를
+     그대로 유지함 — 그 외 색상/모양/타이포는 Figma 팀 값을 그대로 따름.
+     (참고: figma_ui/src/styles/theme.css, StartScreen/ShootingScreen 등) */
   * { box-sizing: border-box; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
-    background: #1a1a1a;
-    color: #eee;
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(160deg, #FFFAF7 0%, #FFF0F4 50%, #FFF8F5 100%);
+    color: #3C2A35;
     margin: 0;
-    padding: 20px;
+    padding: 32px 20px 60px;
     display: flex;
     flex-direction: column;
     align-items: center;
     min-height: 100vh;
   }
-  h1 { font-size: 18px; font-weight: 500; margin: 0 0 16px; }
-  .stage-wrap { position: relative; width: 640px; max-width: 100%; }
+  h1 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #3C2A35;
+    margin: 0 0 20px;
+  }
+  /* 촬영 화면: 너비(640px)는 그대로 유지하고, 카드 느낌(둥근 모서리+테두리+그림자)만 입힘 */
+  .stage-wrap {
+    position: relative;
+    width: 640px;
+    max-width: 100%;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 4px solid #D8708C;
+    box-shadow: 0 20px 60px rgba(60, 42, 53, 0.18);
+    background: linear-gradient(160deg, #2A1E26 0%, #1A1320 100%);
+  }
   video, canvas.overlay {
     position: absolute;
     top: 0; left: 0;
     width: 100%; height: auto;
-    border-radius: 8px;
     transform: scaleX(-1); /* 거울모드 */
   }
   video { position: relative; display: block; background: #000; }
   .status-bar {
     width: 640px; max-width: 100%;
-    margin-top: 14px;
+    margin-top: 18px;
     text-align: center;
+    background: #FFFFFF;
+    border: 1px solid rgba(232, 134, 159, 0.15);
+    border-radius: 20px;
+    padding: 18px 20px;
+    box-shadow: 0 4px 16px rgba(60, 42, 53, 0.08);
   }
   .gesture-name {
+    font-family: 'Poppins', sans-serif;
     font-size: 26px;
-    font-weight: 500;
+    font-weight: 700;
     margin: 4px 0;
+    color: #3C2A35;
   }
   .guide-caption {
     font-size: 14px;
-    color: #bbb;
+    color: #9B7A8A;
     margin: 0 0 4px;
   }
   .sub-status {
     font-size: 14px;
-    color: #aaa;
+    color: #9B7A8A;
     min-height: 20px;
   }
   .progress {
     font-size: 13px;
-    color: #888;
+    color: #C4A8B4;
     margin-top: 6px;
   }
   .countdown-num {
+    font-family: 'Poppins', sans-serif;
     font-size: 64px;
-    font-weight: 700;
-    color: #ffd54a;
+    font-weight: 800;
+    color: #E8869F;
   }
   .hint-hold {
-    color: #6fdc8c;
+    color: #5AB380;
   }
   .hint-wait {
-    color: #888;
-  }
-  #logArea {
-    width: 640px; max-width: 100%;
-    font-size: 11px;
-    color: #666;
-    margin-top: 10px;
-    text-align: left;
-    white-space: pre-wrap;
-    max-height: 60px;
-    overflow-y: auto;
+    color: #9B7A8A;
   }
   .grid8 {
     display: grid;
@@ -82,70 +104,99 @@
   }
   .thumb {
     position: relative;
-    border-radius: 6px;
+    border-radius: 16px;
     overflow: hidden;
     cursor: pointer;
     border: 3px solid transparent;
+    box-shadow: 0 4px 12px rgba(60, 42, 53, 0.08);
+    transition: border-color 0.2s, box-shadow 0.2s;
   }
   .thumb img { width: 100%; display: block; }
-  .thumb.selected { border-color: #ffd54a; }
+  .thumb.selected {
+    border-color: #E8869F;
+    box-shadow: 0 8px 24px rgba(232, 134, 159, 0.35);
+  }
   .thumb .badge {
     position: absolute; top: 4px; left: 4px;
-    background: rgba(0,0,0,0.6);
+    background: rgba(60, 42, 53, 0.65);
     color: #fff; font-size: 10px;
     padding: 2px 6px; border-radius: 10px;
   }
   .thumb .order {
     position: absolute; top: 4px; right: 4px;
-    background: #ffd54a; color: #1a1a1a;
+    background: #E8869F; color: #fff;
     font-size: 12px; font-weight: 700;
     width: 20px; height: 20px; border-radius: 50%;
     display: none; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(232, 134, 159, 0.6);
   }
   .thumb.selected .order { display: flex; }
   button {
-    background: #ffd54a;
-    color: #1a1a1a;
+    background: linear-gradient(135deg, #E8869F, #D8708C);
+    color: #FFFFFF;
     border: none;
-    padding: 10px 22px;
-    border-radius: 20px;
+    padding: 12px 26px;
+    border-radius: 999px;
     font-size: 14px;
     font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
     margin-top: 16px;
+    box-shadow: 0 6px 20px rgba(232, 134, 159, 0.35);
+    transition: transform 0.15s ease;
   }
+  button:hover:not(:disabled) { transform: translateY(-1px); }
   button:active { transform: scale(0.97); }
-  button:disabled { background: #555; color: #999; cursor: not-allowed; }
+  button:disabled { background: #F0E4E8; color: #C4A8B4; cursor: not-allowed; box-shadow: none; }
   .layout-toggle { display: flex; gap: 8px; margin-top: 10px; justify-content: center; }
   .layout-toggle button {
-    background: #333; color: #ccc; padding: 6px 14px; font-size: 12px; margin: 0;
+    background: #F5EEF0; color: #9B7A8A; padding: 8px 18px; font-size: 12px;
+    font-weight: 500; margin: 0; box-shadow: none;
   }
-  .layout-toggle button.active { background: #ffd54a; color: #1a1a1a; }
-  #finalCanvasWrap { margin-top: 16px; text-align: center; }
-  #finalCanvas { max-width: 320px; border-radius: 8px; }
+  .layout-toggle button.active { background: #E8869F; color: #fff; box-shadow: 0 4px 14px rgba(232, 134, 159, 0.35); }
+  #finalCanvasWrap {
+    margin-top: 20px;
+    text-align: center;
+    display: inline-block;
+    padding: 16px;
+    background: #FFFFFF;
+    border-radius: 20px;
+    border: 1px solid rgba(232, 134, 159, 0.15);
+    box-shadow: 0 20px 40px rgba(60, 42, 53, 0.12);
+  }
+  #finalCanvas { max-width: 320px; border-radius: 10px; display: block; }
   .error-box {
-    background: #442222; color: #ffb3b3;
-    padding: 12px 16px; border-radius: 8px;
+    background: #FDE8EF; color: #C2426A;
+    padding: 12px 16px; border-radius: 14px;
+    border: 1px solid rgba(232, 134, 159, 0.3);
     font-size: 13px; margin-top: 16px; max-width: 600px;
+  }
+  button.btn-secondary {
+    background: #F5EEF0;
+    color: #5A4050;
+    box-shadow: none;
   }
 
   /* --- AI 프레임 생성 카드 (4cut_demo에서 병합) --- */
   .option-card {
-    margin-top: 24px;
+    margin-top: 20px;
     width: 640px;
     max-width: 100%;
-    background: #fdf2f6;
-    color: #33262a;
-    border: 1px solid #f0dde4;
-    border-radius: 14px;
-    padding: 16px 18px;
+    background: #FFFFFF;
+    color: #3C2A35;
+    border: 1.5px solid rgba(232, 134, 159, 0.2);
+    border-radius: 20px;
+    padding: 20px 22px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(60, 42, 53, 0.06);
   }
   .option-card h2 {
-    font-size: 14px;
+    font-size: 15px;
+    font-weight: 700;
     margin: 0;
+    color: #3C2A35;
   }
   .option-card .row {
     display: flex;
@@ -157,31 +208,26 @@
   .option-card textarea {
     flex: 1;
     min-width: 0;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid #e3d5da;
+    padding: 11px 14px;
+    border-radius: 12px;
+    border: 1.5px solid rgba(232, 134, 159, 0.25);
     font-size: 13px;
     font-family: inherit;
-    background: #fff;
-    color: #33262a;
+    background: #FFF5F8;
+    color: #3C2A35;
   }
   .option-card textarea {
     min-height: 60px;
     resize: vertical;
   }
   .option-card button {
-    background: #ff8fab;
-    color: #fff;
-  }
-  .option-card button.btn-secondary {
-    background: #fff;
-    color: #33262a;
-    border: 1px solid #e3d5da;
+    margin-top: 0;
   }
   .option-status {
     font-size: 12px;
-    color: #8a7580;
+    color: #9B7A8A;
     min-height: 16px;
+    line-height: 1.5;
   }
   .theme-chip-row {
     display: flex;
@@ -189,49 +235,56 @@
     flex-wrap: wrap;
   }
   .theme-chip {
-    background: #fff;
-    color: #33262a;
-    border: 1px solid #e3d5da;
+    background: #FFFFFF;
+    color: #5A4050;
+    border: 2px solid #F0E4E8;
     border-radius: 999px;
-    padding: 7px 14px;
+    padding: 8px 16px;
     font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
+    box-shadow: 0 2px 8px rgba(60, 42, 53, 0.05);
+    transition: all 0.2s ease;
   }
   .theme-chip.active {
-    background: #ff8fab;
-    color: #fff;
-    border-color: #ff8fab;
+    background: #FDE8EF;
+    color: #E8869F;
+    border-color: #E8869F;
+    font-weight: 600;
+    box-shadow: 0 4px 14px rgba(232, 134, 159, 0.3);
   }
   /* 색상 스와치는 배경색 자체가 의미라서(inline style), .active의 배경색으로
      덮어쓰지 않고 대신 테두리 링으로 선택 상태를 표시함 */
   .simple-color-chip.active {
-    box-shadow: 0 0 0 3px #ff8fab;
+    box-shadow: 0 0 0 3px #FDE8EF, 0 0 0 5px #E8869F;
   }
   .option-card details {
-    border-top: 1px dashed #e3d5da;
+    border-top: 1px dashed rgba(232, 134, 159, 0.3);
     padding-top: 10px;
   }
   .option-card summary {
     cursor: pointer;
     font-size: 13px;
-    color: #8a7580;
+    color: #9B7A8A;
+    font-weight: 500;
   }
   .option-card summary:hover {
-    color: #33262a;
+    color: #3C2A35;
   }
   .option-preview {
     width: 100%;
     max-width: 200px;
     display: none;
     border: 0;
-    border-radius: 8px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(60, 42, 53, 0.1);
   }
   .style-ref-thumb {
     width: 40px;
     height: 40px;
     object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid #e3d5da;
+    border-radius: 10px;
+    border: 1.5px solid rgba(232, 134, 159, 0.25);
     display: none;
   }
 </style>
@@ -247,24 +300,6 @@
   </div>
 
   <div class="status-bar" id="statusBar">
-    <div class="row" style="justify-content:center; margin-bottom:10px;">
-      <select id="testGestureSelect" aria-label="테스트할 포즈 선택" style="max-width:220px;">
-        <option value="">테스트할 포즈 선택</option>
-        <option value="v">브이 ✌️</option>
-        <option value="thumbsup">엄지척 👍</option>
-        <option value="tigerclaw">어흥 🐯</option>
-        <option value="catears">고양이 귀 🐱</option>
-        <option value="cheekheart">볼하트 💕</option>
-        <option value="bigheart">양손하트 🫶</option>
-        <option value="flower">꽃받침 🌸</option>
-        <option value="mouthpose">숭이포즈 ☝️</option>
-        <option value="yahoo">야호포즈 🙌</option>
-        <option value="palmpose">놀라는 포즈 🖐️</option>
-        <option value="rocknroll">락앤롤 포즈 🤟</option>
-      </select>
-      <button type="button" id="applyTestGestureBtn">선택 포즈만 테스트</button>
-      <button type="button" class="btn-secondary" id="randomGestureModeBtn">일반 모드</button>
-    </div>
     <div class="progress" id="progressText">준비 중...</div>
     <div class="gesture-name" id="gestureName">-</div>
     <div class="guide-caption" id="guideCaption"></div>
@@ -272,12 +307,11 @@
     <div class="countdown-num" id="countdownNum"></div>
   </div>
 
-  <div id="logArea"></div>
   <div id="errorBox"></div>
 </div>
 
 <div id="selectView" style="display:none;">
-  <p style="text-align:center; color:#ccc;">마음에 드는 사진 4장을 선택하세요 (<span id="selCount">0</span>/4)</p>
+  <p style="text-align:center; color:#9B7A8A;">마음에 드는 사진 4장을 선택하세요 (<span id="selCount">0</span>/4)</p>
   <div class="grid8" id="grid8"></div>
   <div style="text-align:center;">
     <div class="layout-toggle">
@@ -303,7 +337,7 @@
       <button type="button" class="theme-chip simple-color-chip" data-color="#fffff0" style="background:#fffff0;color:#333;">아이보리</button>
       <button type="button" class="theme-chip simple-color-chip" data-color="#8a8360" style="background:#8a8360;color:#fff;">카키</button>
       <button type="button" class="theme-chip simple-color-chip" data-color="#971e23" style="background:#971e23;color:#fff;">크림슨레드</button>
-      <button type="button" class="theme-chip simple-color-chip" data-color="#000080" style="background:#000080;color:#fff;">남색</button>
+      <button type="button" class="theme-chip simple-color-chip" data-color="#00003d" style="background:#00003d;color:#fff;">남색</button>
     </div>
     <div class="row">
       <input type="text" id="themeCustomInput" placeholder="원하는 테마를 직접 적어도 돼요. 예: 놀이공원에서 찍는 거" />
@@ -313,13 +347,14 @@
 
     <details>
       <summary>고급: 프롬프트 직접 수정</summary>
-      <div class="row" style="margin-top:10px;">
-        <textarea id="promptInput" placeholder="원하는 색과 분위기를 적어주세요. 예: 졸업식 날처럼 꽃다발과 색종이가 흩날리는 화사한 느낌">flat 2D storybook illustration, childlike hand-drawn symbols with solid color fills, ultra-bright high-key pure white-ivory background, clean high-chroma palette, at least ninety percent bare and undecorated, dry wax-pastel texture contained inside each shape, a few small distinct stars and hearts, crisp sharply defined boundaries, plenty of empty space, saturated red, yellow, green, sky blue, pink and orange</textarea>
-      </div>
+      <div class="option-status" style="margin-top:10px;">positive prompt: 여기 적힌 게 실제로 프레임에 그려지는 내용이에요. 위 테마 칩을 고르면 이 칸이 자동으로 채워지고, 직접 수정해서 더 다듬을 수도 있어요.</div>
       <div class="row">
-        <textarea id="negativePromptInput" placeholder="AI가 피했으면 하는 요소를 영어로, 쉼표로 구분해서 적어주세요">animal, character, mascot, repeated motifs, dense ornament, crowded border, clusters, all-over pattern, wallpaper, filled border, oversized motif, colored pencil texture, crayon texture, pencil shading, hatching lines, photorealistic, photograph, 3D render, realistic texture, realistic lighting, muddy colors, desaturated, gray haze, stains, smudges, blur, fuzzy edges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, person, face, crayon stick, art supplies, text, watermark</textarea>
+        <textarea id="promptInput" placeholder="원하는 색과 분위기를 적어주세요. 예: 졸업식 날처럼 꽃다발과 색종이가 흩날리는 화사한 느낌">flat minimal graphic design, solid flat pastel background, simple flat vector icon, no gradients, blurred pastel bokeh dots in corners, high contrast simple shapes, plenty of negative space</textarea>
       </div>
       <div class="option-status">negative prompt: 여기 적힌 건 "이런 건 넣지 마"라는 뜻으로 전달돼요. 긍정 프롬프트에 "no text"처럼 적는 것보다 여기 적는 게 훨씬 잘 먹혀요.</div>
+      <div class="row">
+        <textarea id="negativePromptInput" placeholder="AI가 피했으면 하는 요소를 영어로, 쉼표로 구분해서 적어주세요">animal, character, mascot, repeated motifs, dense ornament, crowded border, clusters, all-over pattern, wallpaper, filled border, oversized motif, storybook illustration, childlike drawing, cartoon, cel shading, thick bold outline, colored pencil texture, crayon texture, pencil shading, hatching lines, watercolor, painterly, ink illustration, brush strokes, sketch, photorealistic, photograph, 3D render, realistic texture, realistic lighting, muddy colors, desaturated, gray haze, stains, smudges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, person, face, crayon stick, art supplies, text, watermark</textarea>
+      </div>
     </details>
 
     <div class="row" style="align-items:center;">
@@ -346,6 +381,19 @@
     <div class="option-status">AI 프레임 없이 깔끔한 배경색만 적용돼요. 한글로 적어도 되고, 비워두면 기본 핑크로 나가요.</div>
   </div>
 
+  <div class="option-card" id="universityPanel">
+    <h2>🎓 대학교 프레임</h2>
+    <div class="row">
+      <input type="text" id="universityInput" placeholder="학교 이름을 입력하세요. 예: 고려대, 카이스트, 한양대" autocomplete="off" />
+      <button class="btn-secondary" id="genUniversityBtn" type="button">학교 프레임 생성</button>
+    </div>
+    <div class="row" style="align-items:center;">
+      <label id="universityLogoLabel" style="font-size:12px;color:#8a7580;flex:1;">로고 업로드는 학교 이름을 먼저 입력해야 활성화돼요</label>
+      <input type="file" id="universityLogoInput" accept="image/*" disabled style="flex:1;min-width:0;font-size:12px;" />
+    </div>
+  </div>
+
+
   <div style="text-align:center;">
     <button id="composeBtn" disabled>4컷 완성하기</button>
   </div>
@@ -357,7 +405,7 @@
   </div>
   <div>
     <button id="downloadBtn">다운로드</button>
-    <button id="restartBtn">처음부터 다시</button>
+    <button id="restartBtn" class="btn-secondary">처음부터 다시</button>
   </div>
 </div>
 
@@ -388,23 +436,14 @@ function shuffle(arr) {
   }
   return a;
 }
-const testGestureId = new URLSearchParams(window.location.search).get('testGesture');
-const testGesture = GESTURES.find(g => g.id === testGestureId) || null;
-const isGestureTestMode = testGesture !== null;
-const chosenGestures = isGestureTestMode ? [testGesture] : shuffle(GESTURES).slice(0, 4);
+const chosenGestures = shuffle(GESTURES).slice(0, 4);
 
-// 일반 모드는 각 제스처를 2번씩, 테스트 모드는 선택한 한 제스처를 8번 반복한다.
+// 각 제스처를 2번씩 = 총 8장
 const sequence = [];
-if (isGestureTestMode) {
-  for (let round = 1; round <= 8; round++) {
-    sequence.push({ ...testGesture, round });
-  }
-} else {
-  chosenGestures.forEach(g => {
-    sequence.push({ ...g, round: 1 });
-    sequence.push({ ...g, round: 2 });
-  });
-}
+chosenGestures.forEach(g => {
+  sequence.push({ ...g, round: 1 });
+  sequence.push({ ...g, round: 2 });
+});
 
 const COUNTDOWN_MS = 3000;
 const RESET_GAP_MS = 1200;         // 촬영 후 다음 동작 준비 텀
@@ -414,6 +453,10 @@ const DETECTION_REQUIRED_HITS = 8; // 10프레임 중 8프레임 이상 성공�
 // 프레임 단위 실패가 잦음)는 6프레임 성공으로 완화해서 인정한다.
 const RELAXED_DETECTION_REQUIRED_HITS = 6;
 const FAILURE_GRACE_MS = 400;      // 순간적인 인식 실패는 400ms까지 허용
+
+// 개발자용 디버그 플래그. true로 켜면 각 판정 함수의 내부 값(간격비·각도·점수)이
+// 0.5초마다 화면 로그에 출력돼 문턱값 튜닝에 쓸 수 있다. 배포 시엔 false로 둔다.
+const DEBUG_POSE = false;
 
 // ---------- 상태 ----------
 let handLandmarker = null;
@@ -434,25 +477,7 @@ const guideCaptionEl = document.getElementById('guideCaption');
 const subStatusEl = document.getElementById('subStatus');
 const progressTextEl = document.getElementById('progressText');
 const countdownNumEl = document.getElementById('countdownNum');
-const logArea = document.getElementById('logArea');
 const errorBox = document.getElementById('errorBox');
-const testGestureSelect = document.getElementById('testGestureSelect');
-
-testGestureSelect.value = testGesture ? testGesture.id : '';
-document.getElementById('applyTestGestureBtn').addEventListener('click', () => {
-  if (!testGestureSelect.value) {
-    subStatusEl.textContent = '먼저 테스트할 포즈를 선택해주세요';
-    return;
-  }
-  const url = new URL(window.location.href);
-  url.searchParams.set('testGesture', testGestureSelect.value);
-  window.location.href = url.toString();
-});
-document.getElementById('randomGestureModeBtn').addEventListener('click', () => {
-  const url = new URL(window.location.href);
-  url.searchParams.delete('testGesture');
-  window.location.href = url.toString();
-});
 
 // 동작별 설명 문구 (일러스트 없이 텍스트로만 안내)
 const GUIDE_CAPTION = {
@@ -470,7 +495,7 @@ const GUIDE_CAPTION = {
 };
 
 function log(msg) {
-  logArea.textContent = (new Date().toLocaleTimeString() + ' ' + msg + '\n' + logArea.textContent).slice(0, 2000);
+  console.log(msg);
 }
 
 
@@ -749,7 +774,7 @@ function cheekHeartComponent(lm, handednessLabel) {
   const gapRatio = dist(lm[4], lm[8]) / handScale;
   const gapOk = gapRatio > 0.15 && gapRatio < 1.5; // 완전히 붙지도(핀치), 너무 벌어지지도 않게
   // 테스트 모드에서 어떤 조건이 실패하는지 실시간 확인용 (loop에서 스로틀 출력)
-  if (isGestureTestMode) {
+  if (DEBUG_POSE) {
     const a = (mcp, pip, tip) => fingerBendAngle3D(lm, mcp, pip, tip).toFixed(0);
     const r = (t, m) => curlRatio(lm, t, m).toFixed(2);
     window.__poseDebug =
@@ -824,7 +849,7 @@ function flowerComponent(lm, handedness) {
   // -0.25까지는 허용해 "손등이 살짝 보이는" 각도는 통과시킨다.
   const palmScore = palmFacingScore(lm, handedness);
   const notBackFacing = palmScore > -0.25;
-  if (isGestureTestMode) {
+  if (DEBUG_POSE) {
     window.__poseDebug =
       `꽃받침 · 관절각 평균(125 초과 필요): ${avgAngle.toFixed(0)}` +
       ` (검지 ${angIdx.toFixed(0)} 중지 ${angMid.toFixed(0)} 약지 ${angRing.toFixed(0)} 소지 ${angPinky.toFixed(0)})` +
@@ -900,7 +925,7 @@ function yahooComponent(lm, _handedness, worldLm) {
   const fallbackOk = palmPointsDown && fallbackExtendedOk && fallbackFoldedOk;
   const preciseOk = extendedOk && pointingDown && foldedOk;
 
-  if (isGestureTestMode) {
+  if (DEBUG_POSE) {
     window.__poseDebug =
       `야호 · 편 손가락 월드각도(각 120 초과, 평균 135 초과): ${indexAngle.toFixed(0)} / ${middleAngle.toFixed(0)}` +
       ` · 아래방향비(각 -0.05 초과, 평균 0.1 초과): ${indexDown.toFixed(2)} / ${middleDown.toFixed(2)}` +
@@ -1046,7 +1071,7 @@ function bigHeartPair(a, b) {
   // 기도 자세(뿌리까지 다 붙음)를 걸러낸다.
   const lobeGap = dist(a[5], b[5]) / scale;
   const lobesApart = lobeGap > 0.2; // 손바닥을 완전히 모아 붙인 자세만 거르는 수준
-  if (isGestureTestMode) {
+  if (DEBUG_POSE) {
     window.__poseDebug =
       `양손하트 · 검지간격비(0.22 미만): ${indexGap.toFixed(2)}` +
       ` · 엄지간격비(0.22 미만): ${thumbGap.toFixed(2)}` +
@@ -1069,7 +1094,7 @@ function makePairChecker(pairFn, label) {
   return function (hands) {
     lastPairPerHandOk = hands.map(() => false);
     if (hands.length < 2 || hands.length % 2 !== 0) {
-      if (isGestureTestMode) {
+      if (DEBUG_POSE) {
         window.__poseDebug = `${label} · 감지된 손 ${hands.length}개 — 두 손씩 짝을 지을 수 없음`;
       }
       return false;
@@ -1103,13 +1128,13 @@ function makePairChecker(pairFn, label) {
       const ok = pairFn(hands[i], hands[j]);
       lastPairPerHandOk[i] = ok;
       lastPairPerHandOk[j] = ok;
-      if (isGestureTestMode && window.__poseDebug) {
+      if (DEBUG_POSE && window.__poseDebug) {
         debugs.push(window.__poseDebug);
         window.__poseDebug = null;
       }
       return ok;
     });
-    if (isGestureTestMode) {
+    if (DEBUG_POSE) {
       window.__poseDebug = pairs.length > 1
         ? `${label} ${pairs.length}쌍 판정 → ` + debugs.join(' ‖ ')
         : debugs[0] || null;
@@ -1245,10 +1270,10 @@ function loop() {
           : hands.map(() => rawOk))
       : hands.map((lm, i) => COMPONENTS[gestureDef.id](lm, handednesses[i], worldHands[i]));
     // 테스트 모드: 판정 함수가 남긴 내부 값을 0.5초마다 로그로 출력 (문턱 튜닝용)
-    if (isGestureTestMode && gestureDef.id === 'yahoo' && window.__poseDebug) {
+    if (DEBUG_POSE && gestureDef.id === 'yahoo' && window.__poseDebug) {
       window.__poseDebug += ` · 인식경로: ${usedRotation ? '회전(180도)' : '일반'}`;
     }
-    if (isGestureTestMode && window.__poseDebug && performance.now() - (window.__poseDebugTs || 0) > 500) {
+    if (DEBUG_POSE && window.__poseDebug && performance.now() - (window.__poseDebugTs || 0) > 500) {
       window.__poseDebugTs = performance.now();
       log(window.__poseDebug);
       window.__poseDebug = null;
@@ -1337,8 +1362,7 @@ function capturePhoto() {
   tctx.drawImage(video, 0, 0, tmp.width, tmp.height);
   const dataUrl = tmp.toDataURL('image/jpeg', 0.92);
   capturedPhotos.push({ dataUrl, gestureName: gestureDef.name, round: gestureDef.round });
-  const roundTotal = isGestureTestMode ? sequence.length : 2;
-  log(`촬영 완료: ${gestureDef.name} (${gestureDef.round}/${roundTotal}) [${capturedPhotos.length}/${sequence.length}]`);
+  log(`촬영 완료: ${gestureDef.name} (${gestureDef.round}/2) [${capturedPhotos.length}/${sequence.length}]`);
 
   countdownStartTs = null;
   resetDetectionStability();
@@ -1359,9 +1383,8 @@ function capturePhoto() {
 
 function showCurrentGesture() {
   const g = sequence[currentIdx];
-  const roundTotal = isGestureTestMode ? sequence.length : 2;
   gestureNameEl.textContent = g.name;
-  progressTextEl.textContent = `${isGestureTestMode ? '테스트 모드 · ' : ''}${currentIdx + 1} / ${sequence.length}번째 촬영  (${g.name.split(' ')[0]} - ${g.round}/${roundTotal}회차)`;
+  progressTextEl.textContent = `${currentIdx + 1} / ${sequence.length}번째 촬영  (${g.name.split(' ')[0]} - ${g.round}/2회차)`;
   guideCaptionEl.textContent = GUIDE_CAPTION[g.id] || '';
 }
 
@@ -1443,18 +1466,95 @@ const finalCanvas = document.getElementById('finalCanvas');
 // background" 등 구조 지시) 기준으로 실측(node로 토큰 추정)해서, 핵심 지시가
 // 잘리지 않는 선까지만 구체화한 것. 더 길게 늘리면 뒤쪽의 "vast bare background"
 // 같은 중요 지시가 잘려서 오히려 산만한 결과가 나올 수 있음.
+// 대부분의 테마는 motifs만 있고 style은 비워서 아래 THEME_STYLE_SKELETON(공통
+// soft/minimal 톤)을 그대로 씀. 다만 일부 테마는 그 톤으로 그리면 모티프 자체가
+// 잘 안 보이거나(바다: 파도/조개는 얇은 라인아트+옅은 수채로는 형태가 거의 안
+// 잡힘) 원하는 무드가 다른 경우(하트: 미니멀이 아니라 키치한 하이틴 스티커
+// 느낌을 원함)라서, 그런 테마만 style을 따로 지정해 공통 톤을 덮어씀.
+// negativePromptInput의 원래 기본값 — style/negative를 안 쓰는 테마로 되돌아갈 때 이걸로 복원함.
+// (재수정) "사진처럼 나온다"는 것과 별개로 "그림/일러스트 작품처럼 나온다"는
+// 피드백이 있어서, watercolor/painterly/ink illustration/brush strokes/sketch를
+// 새로 추가함(붓이나 색연필로 그린 듯한 느낌 자체를 막음). 대신 보케(bokeh) 효과는
+// 의도적으로 원하는 것이라 "blur, fuzzy edges"는 빼서 서로 충돌하지 않게 함.
+const DEFAULT_NEGATIVE_PROMPT_TEXT =
+  'animal, character, mascot, repeated motifs, dense ornament, crowded border, clusters, all-over pattern, wallpaper, filled border, oversized motif, storybook illustration, childlike drawing, cartoon, cel shading, thick bold outline, colored pencil texture, crayon texture, pencil shading, hatching lines, watercolor, painterly, ink illustration, brush strokes, sketch, photorealistic, photograph, 3D render, realistic texture, realistic lighting, muddy colors, desaturated, gray haze, stains, smudges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, person, face, crayon stick, art supplies, text, watermark';
+// 우주는 AI 텍스트 프롬프트로는 "실제 은하수 사진"처럼 나오거나(사막·지평선까지
+// 딸려나옴) 노란 별 클립아트로 화면이 꽉 차버리는 등 원하는 "불꽃놀이처럼 은은하게
+// 반짝이는 어두운 배경"과는 거리가 먼 결과가 반복돼서, simple 테마와 같은 이유로 AI를
+// 건너뛰고 canvas로 직접 그림 (generateSpaceFrame 참고).
+// 생일/크리스마스/하트는 "flat vector icon"이라고만 하면 아무리 강조해도 회색
+// 테이블 위에 놓인 진짜 풍선 뭉치/트리 가지+유리 오너먼트/하트 모양 사탕 스톡사진처럼
+// 나왔음(구체적인 사물을 주면 이 모델이 "아이콘"보다 "실사"쪽으로 강하게 쏠리는
+// 경향). 그래서 캔버스로 바꿨다가, negative에 "photorealistic, photograph, stock
+// photo, studio photography, glossy 3D render, depth of field, shadow" 등
+// 실제로 나온 결과에 맞춘 구체적인 항목을 넣고 guidance를 8→11로 올렸더니 AI로도
+// 플랫한 스티커 느낌이 나오는 걸 재확인함(BIRTHDAY_CHRISTMAS_NEGATIVE 참고). 다만
+// 그렇게 사실적 묘사를 강하게 막으니 이번엔 화면을 풍선/눈꽃으로 꽉 채우는 쪽으로
+// 쏠려서, strength를 1→0.8로 낮춰 흰 캔버스(=여백)에 조금 더 앵커링되게 해서
+// 여백도 같이 확보함.
+// 크리스마스는 모티프를 각각 단수(a snowflake 등)로 주면 시드에 따라 "장식이
+// 딱 1개만 나오고 나머지 전체가 텅 빔" 현상이 있었음(실제 생성 테스트로 확인).
+// 생일 모티프의 "a couple of balloons", "scattered confetti"처럼 개수를 복수/분산
+// 표현으로 바꿨더니 스트립 전체에 고르게 흩뿌려지는 빈도가 늘어서 같은 패턴을 적용함.
+// 그래도 완전히 결정적이진 않아서(가끔 여전히 몰림) getGeneratedImageIssue()에
+// "몇 개 구역이 통째로 비어있으면 재시도" 체크를 추가해 이중으로 방어함.
+const BIRTHDAY_CHRISTMAS_NEGATIVE =
+  'photorealistic, photograph, photography, stock photo, studio photography, glossy 3D render, realistic lighting, depth of field, shadow, all-over pattern, wallpaper, dense ornament, crowded border, clusters, repeated motifs, filled border, oversized motif, storybook illustration, childlike drawing, watercolor, painterly, text, watermark';
+const BIRTHDAY_CHRISTMAS_STYLE =
+  'cute kawaii sticker illustration, bold flat colors, clean thick outline, ultra-bright pastel background, plenty of empty space';
+
 const THEME_PRESETS = {
-  space: 'a small rocket, a ringed planet, a few stars, a crescent moon, a helmet icon',
-  birthday: 'a small birthday cake, a couple of balloons, scattered confetti, a small gift box',
-  heart: 'a couple of cute hearts, a small ribbon, a heart-shaped love icon',
-  christmas: 'a small christmas tree, a snowflake, a round ornament, a small santa hat',
-  travel: 'a small seashell, a gentle wave, a palm leaf, a small sailboat',
+  birthday: {
+    motifs: 'a small birthday cake, a couple of balloons, scattered confetti, a small gift box',
+    style: BIRTHDAY_CHRISTMAS_STYLE,
+    negative: BIRTHDAY_CHRISTMAS_NEGATIVE,
+    guidance: 11.0,
+    strength: 0.8,
+  },
+  christmas: {
+    motifs: 'a small christmas tree, a couple of ornaments, scattered snowflakes, a small santa hat',
+    style: BIRTHDAY_CHRISTMAS_STYLE,
+    negative: BIRTHDAY_CHRISTMAS_NEGATIVE,
+    guidance: 11.0,
+    strength: 0.8,
+  },
+  heart: {
+    motifs: 'a few glossy pink heart stickers, a small pink gingham checkered patch, a soft glowing heart, scattered heart confetti',
+    style: BIRTHDAY_CHRISTMAS_STYLE,
+    negative: BIRTHDAY_CHRISTMAS_NEGATIVE,
+    guidance: 11.0,
+    strength: 0.8,
+  },
+  // "gentle wave", "seashell"처럼 형태가 가늘고 대비가 약한 대상은 delicate thin
+  // line art + pale watercolor 톤에서 거의 안 보였음. 채도는 낮더라도 면을 확실히
+  // 채우는 flat solid color fills로 바꿔서 파도·모래사장·야자수 실루엣이 남게 함.
+  travel: {
+    motifs: 'a small palm tree, a curling ocean wave, a seashell, a strip of sandy beach',
+    style: 'flat solid color fills, clean bold shapes, ultra-bright white background, plenty of empty space',
+  },
 };
 // "hand-drawn symbols"(손그림)를 빼고 "clean flat vector icon"으로 바꿔서
 // 색연필/크레용으로 칠한 듯한 거친 질감이 덜 나오게 함. "flat 2D"는 그대로 남겨서
 // generateFrame()의 guardedBasePrompt가 이 문구를 중복으로 앞에 또 붙이지 않게 함.
+//
+// (수정) "storybook illustration / childlike" 계열 단어가 동화책 삽화처럼 너무
+// 유치하고 진한 느낌을 만들어서, 포토이즘 벚꽃 프레임처럼 "여백이 넓고 장식은
+// 옅은 수채/라인아트로 아주 조금만 있는" 느낌으로 바꿈. requiredDoodleStyle
+// 가드(generateFrame() 안)도 반드시 이 문구와 동일하게 맞춰야 함 — 서로 다른
+// 키워드를 쓰면 가드가 "이 스타일 문구가 없다"고 판단해서 옛날 문구를 또
+// 앞에 붙여버림.
+//
+// (재수정) 위 문구가 "elegant simple decoration, mostly white and pastel
+// background, professional photobooth aesthetic"까지 붙어서 길어지다 보니, SD1.5
+// CLIP의 77토큰 한계(청킹 없음)에서 뒤쪽에 오는 실제 테마 모티프(로켓/케이크/
+// 트리 등)가 통째로 잘려나가는 문제가 있었음. 같은 톤(soft pale watercolor,
+// minimal)은 유지하되 문구 자체를 줄여서 모티프가 잘릴 여지를 줄임.
+//
+// (3차 수정) "delicate thin line art, soft pale watercolor"가 결과적으로 손그림/
+// 수채화 작품처럼 나온다는 피드백으로, 붓터치·수채 느낌을 완전히 빼고 "플랫
+// 아이콘 + 보케(bokeh) 도트"로 이루어진 그래픽 디자인/편집디자인 톤으로 바꿈.
 const THEME_STYLE_SKELETON =
-  'flat 2D vector illustration, clean simple icon-style symbols, smooth solid color fills, soft pastel colors, cheerful mood';
+  'flat minimal graphic design, solid flat pastel background, simple flat vector icon, no gradients, blurred pastel bokeh dots in corners, high contrast simple shapes, plenty of negative space';
 
 // "심플"은 다른 테마와 달리 무늬(doodle)가 "전혀" 없어야 하는데, AI 인페인팅
 // 모델은 negative prompt를 아무리 강하게 줘도 미세한 선/얼룩 하나 정도는 남기는
@@ -1467,7 +1567,7 @@ const SIMPLE_COLORS = {
   '#fffff0': '아이보리',
   '#8a8360': '카키',
   '#971e23': '크림슨레드',
-  '#000080': '남색',
+  '#00003d': '남색',
 };
 
 const themeChipRow = document.getElementById('themeChipRow');
@@ -1478,13 +1578,32 @@ const themeStatus = document.getElementById('themeStatus');
 
 let selectedThemeId = null; // 'simple'이면 genFrameBtn이 AI 대신 단색 생성을 씀
 let simpleColor = '#ffffff';
+// 테마별로 guidance/strength까지 다르게 쓰고 싶어서(생일/크리스마스는 결과가
+// 실사처럼 나오는 문제 때문에 값을 따로 튜닝함) generateFrame()이 참조하는 상태값.
+// applyThemeMotifs()가 테마를 바꿀 때마다 같이 갱신하고, 지정 안 하면 기존
+// 기본값(8.0 / styleRefImg 유무에 따른 값)으로 돌아감.
+let themeGuidance = 8.0;
+let themeStrength = null;
 
-function applyThemeMotifs(motifText, sourceLabel) {
+function applyThemeMotifs(motifText, sourceLabel, style = THEME_STYLE_SKELETON, negative = DEFAULT_NEGATIVE_PROMPT_TEXT, guidance = 8.0, strength = null) {
+  themeGuidance = guidance;
+  themeStrength = strength;
   // "only a few small isolated motifs, plenty of empty space"는 예전엔 여기서
   // 붙였는데, generateFrame()이 최종 조립 시 이미 거의 같은 뜻의 문구("vast bare
   // background" 등)를 붙이고 있어서 중복이었음. 모티프 서술을 구체화할 자리를
   // 만들려고 중복분을 빼고, 실제로 필요한 지시는 generateFrame() 쪽에 맡김.
-  promptInput.value = `${THEME_STYLE_SKELETON}, decorated sparsely with ${motifText}`;
+  //
+  // 모티프(motifText)를 스타일 문구보다 앞에 둠 — CLIP 77토큰 한계에 걸려 뒷부분이
+  // 잘리더라도, "무엇을 그릴지"가 "어떤 화풍으로 그릴지"보다 더 중요하므로 먼저
+  // 잘리지 않게 앞자리를 줌. "decorated sparsely" 표시는 generateFrame()의 가드가
+  // "이미 테마 스타일이 갖춰진 프롬프트"인지 판단하는 기준으로도 씀. style은
+  // 테마별로 다른 화풍(예: 바다는 solid fill, 하트는 키치한 스티커풍)을 쓰고
+  // 싶을 때만 넘기고, 안 넘기면 공통 THEME_STYLE_SKELETON을 씀(자유 입력 테마용).
+  // negative도 테마가 지정한 게 있으면 그걸로 바꿔치기하고, 없으면 기본값으로
+  // 되돌림 — 안 그러면 하트 테마 고른 뒤 다른 테마로 넘어가도 완화된 negative가
+  // 계속 남아있게 됨.
+  promptInput.value = `${motifText}, decorated sparsely, ${style}`;
+  negativePromptInput.value = negative;
   themeStatus.textContent = `"${sourceLabel}" 테마가 프롬프트에 반영됐어요. "고급" 항목을 펼치면 직접 다듬을 수도 있어요.`;
 }
 
@@ -1498,9 +1617,23 @@ themeChipRow.querySelectorAll('.theme-chip').forEach((chip) => {
     if (theme === 'simple') {
       simpleColorRow.style.display = 'flex';
       themeStatus.textContent = '아래에서 프레임 색을 골라주세요 (흰색 또는 검정, AI 없이 바로 채워요).';
+    } else if (theme === 'space') {
+      // 우주(불꽃놀이 반짝임)는 텍스트 프롬프트로는 안정적으로 재현이 안 돼서(실제
+      // 테스트에서 매번 스톡사진 은하수나 화면을 꽉 채우는 클립아트로 나옴), AI 호출
+      // 없이 canvas로 직접 그림 — simple 테마와 같은 이유로 AI를 건너뜀.
+      simpleColorRow.style.display = 'none';
+      themeStatus.textContent = '어두운 밤하늘 + 불꽃놀이 반짝임으로 바로 채워져요 (AI를 안 거쳐서 항상 안정적으로 나와요).';
     } else {
       simpleColorRow.style.display = 'none';
-      applyThemeMotifs(THEME_PRESETS[theme], chip.textContent.trim());
+      const preset = THEME_PRESETS[theme];
+      applyThemeMotifs(
+        preset.motifs,
+        chip.textContent.trim(),
+        preset.style || THEME_STYLE_SKELETON,
+        preset.negative || DEFAULT_NEGATIVE_PROMPT_TEXT,
+        preset.guidance ?? 8.0,
+        preset.strength ?? null
+      );
     }
   });
 });
@@ -1558,6 +1691,13 @@ themeCustomInput.addEventListener('keydown', (e) => {
 
 let stripFrameImg = null; // 세로 1x4 또는 2x2 전체를 한 번에 생성한 프레임 이미지
 let stripFrameRequestSize = null;
+// true면 stripFrameImg 안에 로고+영문명이 이미 다 그려져 있다는 뜻이라,
+// composeVertical()의 기본 하트+제목+날짜 오버레이를 건너뛰어야 함
+let universityFrameActive = false;
+// 2x2에서 학교 프레임을 적용하면 여기에 학교 정보를 저장해서, composeGrid()가
+// 제목 옆에 로고도 같이 그리게 함. gridColorInput을 사용자가 직접 고치면(학교
+// 색이 아니게 되므로) null로 되돌림 — 아래 input 리스너 참고.
+let gridUniversity = null;
 let styleRefImg = null; // 업로드한 스타일 참고 이미지(선택)
 
 const DEFAULT_STYLE_REF_STATUS = '선택 사항: 색감·분위기를 따라 하고 싶은 참고 이미지를 올리면 그 톤에 맞춰 테두리를 생성해요.';
@@ -1979,6 +2119,7 @@ function drawStripSeparator(ctx, centerY, height, W, frameH) {
 }
 
 async function generateFrame() {
+  universityFrameActive = false;
   const basePrompt = promptInput.value.trim();
   if (!basePrompt) {
     frameStatus.textContent = '프롬프트를 입력해주세요.';
@@ -2006,11 +2147,21 @@ async function generateFrame() {
   // (1) 문장을 짧게, (2) 구조적으로 중요한 지시를 앞쪽에, (3) 긍정 프롬프트에
   // "no X" 형태의 부정문을 넣지 않음(대신 negativePrompt에만 명시)
   const styleRefSuffix = styleRefImg ? ', matching the reference image colors and composition' : '';
-  const requiredDoodleStyle = 'flat 2D storybook illustration, childlike hand-drawn symbols, solid color fills';
-  const guardedBasePrompt = /storybook illustration|hand-drawn symbols|flat 2D/i.test(basePrompt)
+  const requiredDoodleStyle = 'flat minimal graphic design, solid flat pastel background, simple flat vector icon';
+  // "decorated sparsely"는 applyThemeMotifs()가 테마 프롬프트를 만들 때 항상 붙이는
+  // 표시라, 이 문구가 있으면 이미 (테마별로 다를 수 있는) 스타일까지 다 갖춘
+  // 프롬프트라는 뜻. 예전엔 requiredDoodleStyle의 고정 문구가 있는지로 판단했는데,
+  // 바다/하트처럼 테마마다 다른 스타일 문구를 쓰기 시작하면서 그 방식이 깨져서
+  // (스타일이 다르다고 오판해 매번 requiredDoodleStyle을 또 앞에 붙여버림) 기준을
+  // 바꿈. "고급"에서 직접 쓴 프롬프트(이 표시가 없음)만 여기서 스타일이 보강됨.
+  const guardedBasePrompt = /decorated sparsely/i.test(basePrompt)
     ? basePrompt
     : `${requiredDoodleStyle}, ${basePrompt}`;
-  const prompt = `${guardedBasePrompt}, only one or two tiny isolated motifs across the entire strip, vast bare background${styleRefSuffix}`;
+  // "vast bare background"/"mostly plain border..." 같은 문구를 예전엔 두세 군데서
+  // 중복으로 반복했는데(스타일 문구 자체에 이미 "plenty of empty space"가 있음),
+  // 그만큼 테마 모티프 쪽 토큰이 뒤로 밀려서 77토큰 한계에 잘려나갔음. 여기서는
+  // "몇 개만, 전체 스트립에 걸쳐"라는 배치 지시 하나만 추가로 남김.
+  const prompt = `${guardedBasePrompt}, only a few tiny isolated accents across the entire strip${styleRefSuffix}`;
 
   // negativePrompt는 negativePromptInput에서 직접 편집 가능. 비워두면
   // 안전한 기본값(DEFAULT_NEGATIVE_BASE)으로 되돌아감.
@@ -2026,8 +2177,11 @@ async function generateFrame() {
   const negativePrompt = `${guardedNegativeBase}, empty canvas, rectangular openings, grid lines`;
 
   const seed = Math.floor(Math.random() * 2000000000);
-  // 참고 이미지가 있을 때만 해당 이미지의 색과 구도를 보존함.
-  const genStrength = styleRefImg ? 0.55 : 1;
+  // 참고 이미지가 있을 때만 해당 이미지의 색과 구도를 보존함. 참고 이미지가 없으면
+  // themeStrength(테마별 지정값, 없으면 1)를 씀 — 생일/크리스마스는 strength를
+  // 낮춰서(0.8) 흰 캔버스 쪽에 살짝 더 앵커링되게 했더니 "풍선으로 화면을 꽉
+  // 채우는" 문제가 줄어들었음(실제 생성 테스트로 확인).
+  const genStrength = styleRefImg ? 0.55 : (themeStrength ?? 1);
   try {
     const maxAttempts = 3;
     let acceptedFrame = null;
@@ -2038,16 +2192,16 @@ async function generateFrame() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `${prompt}, mostly plain border with isolated doodles`,
+          prompt,
           negativePrompt,
           width: requestW, height: requestH,
           image: imageB64, mask: maskBytes,
           seed: (seed + (attempt - 1) * 7919) % 2147483647,
           strength: genStrength,
-          // guidance를 낮게 유지하면 텍스트 지시를 붙잡는 힘도 약해져서 어둡고
-          // 밀도 높은 결과로 흐르는 경향이 있었음. negativePrompt가 충분히
-          // 방어하고 있어서 8.0으로 밝기 유지
-          guidance: 8.0
+          // 기본은 8.0(밝기 유지). 생일/크리스마스는 실제 사진처럼 나오는 문제가
+          // 있어서 themeGuidance를 11.0으로 올려 negativePrompt(사실적 묘사 금지)를
+          // 더 강하게 따르도록 튜닝함(실제 생성 테스트로 확인).
+          guidance: themeGuidance
         })
       });
 
@@ -2113,6 +2267,7 @@ function buildSolidFrameDataUrl(w, h, color) {
 // 없어서 100% 무늬 없는 결과가 보장됨. (선택한 layout 크기에 맞춰 즉시 생성되므로
 // 네트워크 요청도, 재시도도 필요 없음)
 async function generateSimpleFrame() {
+  universityFrameActive = false;
   genFrameBtn.disabled = true;
   framePreview.style.display = 'none';
   const size = getStripVerticalSize();
@@ -2127,20 +2282,397 @@ async function generateSimpleFrame() {
 }
 
 function clearFrame() {
+  universityFrameActive = false;
   stripFrameImg = null;
   stripFrameRequestSize = null;
   framePreview.style.display = 'none';
   frameStatus.textContent = '기본 디자인으로 돌아갔어요.';
 }
 
+// ---------- 우주 프레임 (AI 없이 canvas로 직접 그림) ----------
+// 둘 다 "구체적인 그래픽 스타일"(하트: 하이틴 다이어리 깅엄+스티커, 우주: 어두운
+// 밤하늘 + 불꽃놀이 반짝임)을 원하는데, 텍스트 프롬프트로는 매번 다르게 나오거나
+// (하트) 실제 은하수 사진처럼/별 클립아트로 화면이 꽉 차버리는(우주) 등 원하는
+// 느낌과 거리가 먼 결과가 반복돼서, simple 테마와 같은 방식으로 AI 호출 자체를
+// 건너뛰고 코드로 직접 그려서 항상 같은 느낌을 보장함.
+
+// 사진 네 장이 세로 스트립 높이의 대부분(각 칸의 photoH+margin*2)을 차지하고
+// 남는 "뚫린" 구역은 위쪽 여백 1개 + 사진 사이 이음매 3개(각각 34px 정도로 아주
+// 얇음) + 아래쪽 푸터, 이렇게 5곳뿐임. 처음엔 "캔버스 전체에서 무작위 좌표를
+// 뽑고 사진 자리와 겹치면 다시 뽑기"로 짰는데, 그러면 사진 사이 34px짜리 좁은
+// 틈에는 장식이 거의 안 들어가고(반지름이 그 틈보다 큰 경우가 많아 계속
+// 실패) 상대적으로 넓은 푸터 쪽에만 잔뜩 몰리는 문제가 있었음(실제로 렌더링해서
+// 확인함). 그래서 "뚫린 구역 5곳을 미리 계산해두고 장식들을 그 5곳에 고르게
+// 나눠 배정"하는 방식으로 바꿈 — 이러면 좁은 틈에서는 크기를 그 틈에 맞게
+// 자동으로 줄여서라도 반드시 그 구역 안에 들어가고, 넓은 구역(위/아래)에서는
+// 원래 크기 그대로 나와서 전체적으로 스트립 전체에 고르게 흩뿌려짐.
+function getOpenBands(size) {
+  const { H, pad, chipH, border, margin, photoH } = size;
+  const bands = [];
+  let prevBottom = 0;
+  for (let i = 0; i < 4; i++) {
+    const chipY = pad + i * chipH;
+    const protTop = chipY + border - margin;
+    const protBottom = protTop + photoH + margin * 2;
+    if (protTop > prevBottom) bands.push({ yMin: prevBottom, yMax: protTop });
+    prevBottom = protBottom;
+  }
+  if (H > prevBottom) bands.push({ yMin: prevBottom, yMax: H });
+  return bands;
+}
+
+function scatterAvoidingPhotos(size, count, minSize, maxSize) {
+  const { W } = size;
+  const bands = getOpenBands(size);
+  const positions = [];
+  for (let i = 0; i < count; i++) {
+    const band = bands[i % bands.length];
+    const bandH = Math.max(1, band.yMax - band.yMin);
+    const itemSize = Math.min(minSize + Math.random() * (maxSize - minSize), bandH * 0.9);
+    const y = band.yMin + itemSize / 2 + Math.random() * Math.max(1, bandH - itemSize);
+    const x = 20 + Math.random() * (W - 40);
+    positions.push({ x, y, size: itemSize });
+  }
+  return positions;
+}
+
+// --- 우주 ---
+const SPACE_STAR_COLORS = ['#FFFFFF', '#FFF6D9', '#D9E8FF', '#FFE3F0'];
+
+// 불꽃놀이 느낌: 중심에서 사방으로 뻗는 얇은 선 몇 가닥 + 중앙의 작은 반짝임(sparkle)
+function drawFirework(ctx, cx, cy, size, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, size * 0.05);
+  ctx.globalAlpha = 0.75;
+  const rays = 10;
+  for (let i = 0; i < rays; i++) {
+    const angle = (Math.PI * 2 * i) / rays + Math.random() * 0.2;
+    const len = size * (0.55 + Math.random() * 0.45);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len);
+    ctx.stroke();
+  }
+  ctx.restore();
+  drawSparkle(ctx, cx, cy, size * 0.32, color);
+}
+
+async function generateSpaceFrame() {
+  universityFrameActive = false;
+  genFrameBtn.disabled = true;
+  framePreview.style.display = 'none';
+  const size = getStripVerticalSize();
+  const c = document.createElement('canvas');
+  c.width = size.W;
+  c.height = size.H;
+  const ctx = c.getContext('2d');
+
+  const grad = ctx.createLinearGradient(0, 0, size.W, size.H);
+  grad.addColorStop(0, '#1B1F3B');
+  grad.addColorStop(0.55, '#232A52');
+  grad.addColorStop(1, '#12152C');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size.W, size.H);
+
+  // 자잘하게 반짝이는 별들
+  scatterAvoidingPhotos(size, 70, 1.5, 4).forEach((p) => {
+    const color = SPACE_STAR_COLORS[Math.floor(Math.random() * SPACE_STAR_COLORS.length)];
+    drawSparkle(ctx, p.x, p.y, p.size, color);
+  });
+  // 불꽃놀이처럼 크게 반짝이는 포인트 몇 개
+  scatterAvoidingPhotos(size, 5, 10, 20).forEach((p) => {
+    drawFirework(ctx, p.x, p.y, p.size, '#FFFFFF');
+  });
+
+  const dataUrl = c.toDataURL('image/png');
+  stripFrameImg = await loadImage(dataUrl);
+  stripFrameRequestSize = { width: size.W, height: size.H };
+  framePreview.src = dataUrl;
+  framePreview.style.display = 'block';
+  themeStatus.textContent = '어두운 밤하늘 + 불꽃놀이 반짝임 프레임 적용 완료! (AI를 안 거쳐서 항상 안정적으로 나와요)';
+  frameStatus.textContent = '우주 프레임이 적용됐어요.';
+  genFrameBtn.disabled = false;
+}
+
 genFrameBtn.addEventListener('click', () => {
   if (selectedThemeId === 'simple') {
     generateSimpleFrame();
+  } else if (selectedThemeId === 'space') {
+    generateSpaceFrame();
   } else {
     generateFrame();
   }
 });
 clearFrameBtn.addEventListener('click', clearFrame);
+
+// ---------- 대학교 프레임 ----------
+// 실제 학교 로고(교표)는 학교마다 등록된 상표/저작물이라, 제가 임의로 구해서
+// 코드에 박아넣진 않음(학교마다 라이선스 조건이 다 다르고 확인이 안 됨).
+// 대신 "학교 이름/색상/영문명"까지는 자체 데이터로 미리 넣어두고, 실제 로고
+// 이미지는 사용자가 정당하게 구한 파일을 업로드하면 그 학교 키로 저장해서
+// 이후에는 자동으로 재사용함 (localStorage에 저장 — 이 앱은 Claude 아티팩트가
+// 아니라 사용자 컴퓨터에서 직접 돌아가는 일반 웹앱이라 localStorage 사용 가능).
+// 로고를 아직 안 올렸으면 학교색 안에 이니셜만 넣은 자체 제작 배지로 대체함.
+//
+// color는 각 학교 브랜드 가이드에서 흔히 쓰이는 대표색을 최대한 가깝게 넣은
+// 근사치임. 실제 학교 공식 브랜드 컬러 코드를 알고 있다면 아래 값만 바꾸면 됨.
+const UNIVERSITY_PRESETS = [
+  { key: 'snu', aliases: ['서울대', '서울대학교', 'snu', 'seoul national university'], color: '#003876', englishName: 'SEOUL NATIONAL UNIVERSITY', initial: 'SNU' },
+  { key: 'yonsei', aliases: ['연세대', '연세대학교', 'yonsei', 'yonsei university'], color: '#00205b', englishName: 'YONSEI UNIVERSITY', initial: 'Y' },
+  { key: 'korea', aliases: ['고려대', '고려대학교', 'ku', 'korea university'], color: '#8b1e3f', englishName: 'KOREA UNIVERSITY', initial: 'KU' },
+  { key: 'kaist', aliases: ['카이스트', 'kaist'], color: '#0a3161', englishName: 'KAIST', initial: 'K' },
+  { key: 'hanyang', aliases: ['한양대', '한양대학교', 'hanyang', 'hanyang university'], color: '#004a93', englishName: 'HANYANG UNIVERSITY', initial: 'H' },
+  { key: 'ewha', aliases: ['이화여대', '이화여자대학교', 'ewha', 'ewha womans university'], color: '#1f5c3f', englishName: 'EWHA WOMANS UNIVERSITY', initial: 'E' },
+  { key: 'skku', aliases: ['성균관대', '성균관대학교', 'skku', 'sungkyunkwan university'], color: '#002855', englishName: 'SUNGKYUNKWAN UNIVERSITY', initial: 'SKKU' },
+  { key: 'sogang', aliases: ['서강대', '서강대학교', 'sogang', 'sogang university'], color: '#b0212f', englishName: 'SOGANG UNIVERSITY', initial: 'S' },
+  { key: 'cau', aliases: ['중앙대', '중앙대학교', 'cau', 'chung-ang university', 'chungang university'], color: '#0f2b5c', englishName: 'CHUNG-ANG UNIVERSITY', initial: 'CAU' },
+  { key: 'khu', aliases: ['경희대', '경희대학교', 'khu', 'kyung hee university'], color: '#6f1d3c', englishName: 'KYUNG HEE UNIVERSITY', initial: 'KHU' },
+  { key: 'hufs', aliases: ['한국외대', '한국외국어대학교', '외대', 'hufs', 'hankuk university of foreign studies'], color: '#003d7c', englishName: 'HANKUK UNIVERSITY OF FOREIGN STUDIES', initial: 'HUFS' },
+  { key: 'uos', aliases: ['서울시립대', '서울시립대학교', 'uos', 'university of seoul'], color: '#004b93', englishName: 'UNIVERSITY OF SEOUL', initial: 'UOS' },
+  { key: 'konkuk', aliases: ['건국대', '건국대학교', 'konkuk', 'konkuk university'], color: '#006241', englishName: 'KONKUK UNIVERSITY', initial: 'KU' },
+  { key: 'dongguk', aliases: ['동국대', '동국대학교', 'dongguk', 'dongguk university'], color: '#6a1b2e', englishName: 'DONGGUK UNIVERSITY', initial: 'DGU' },
+  { key: 'hongik', aliases: ['홍익대', '홍익대학교', 'hongik', 'hongik university'], color: '#c8102e', englishName: 'HONGIK UNIVERSITY', initial: 'HU' },
+  { key: 'sookmyung', aliases: ['숙명여대', '숙명여자대학교', 'sookmyung', "sookmyung women's university"], color: '#4b1e6d', englishName: "SOOKMYUNG WOMEN'S UNIVERSITY", initial: 'SM' },
+  { key: 'kookmin', aliases: ['국민대', '국민대학교', 'kookmin', 'kookmin university'], color: '#003876', englishName: 'KOOKMIN UNIVERSITY', initial: 'KMU' },
+  { key: 'postech', aliases: ['포항공대', '포스텍', 'postech', 'pohang university of science and technology'], color: '#a6192e', englishName: 'POSTECH', initial: 'P' },
+  { key: 'pusan', aliases: ['부산대', '부산대학교', 'pnu', 'pusan national university'], color: '#003876', englishName: 'PUSAN NATIONAL UNIVERSITY', initial: 'PNU' },
+  { key: 'unist', aliases: ['유니스트', '울산과학기술원', 'unist', 'ulsan national institute of science and technology'], color: '#001c54', englishName: 'UNIST', initial: 'U' },
+  { key: 'dgist', aliases: ['디지스트', '대구경북과학기술원', 'dgist', 'daegu gyeongbuk institute of science and technology'], color: '#0a1a3a', englishName: 'DGIST', initial: 'D' },
+];
+
+function normalizeUnivQuery(str) {
+  return str.toLowerCase().replace(/\s|대학교|대학|학교/g, '');
+}
+
+function findUniversity(query) {
+  const q = normalizeUnivQuery(query);
+  if (!q) return null;
+  // 정확히 일치하는 것을 우선하고, 없으면 부분 일치(입력이 별칭에 포함되거나
+  // 별칭이 입력에 포함되는 경우)로 한 번 더 찾음
+  for (const u of UNIVERSITY_PRESETS) {
+    if (u.aliases.some((a) => normalizeUnivQuery(a) === q)) return u;
+  }
+  for (const u of UNIVERSITY_PRESETS) {
+    if (u.aliases.some((a) => { const na = normalizeUnivQuery(a); return na.includes(q) || q.includes(na); })) return u;
+  }
+  return null;
+}
+
+// 사용자가 업로드한 로고를 학교 key 기준으로 저장. 브라우저에 영구 저장돼서
+// 한 번 올려두면 다음에 같은 학교를 입력할 때 자동으로 다시 쓰임.
+const UNIV_LOGO_STORAGE_KEY = 'aiFourCutUniversityLogos';
+function loadLogoOverrides() {
+  try {
+    return JSON.parse(localStorage.getItem(UNIV_LOGO_STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+function saveLogoOverride(key, dataUrl) {
+  const all = loadLogoOverrides();
+  all[key] = dataUrl;
+  localStorage.setItem(UNIV_LOGO_STORAGE_KEY, JSON.stringify(all));
+}
+
+const universityInput = document.getElementById('universityInput');
+const genUniversityBtn = document.getElementById('genUniversityBtn');
+const universityStatus = document.getElementById('universityStatus');
+const universityLogoInput = document.getElementById('universityLogoInput');
+const universityLogoLabel = document.getElementById('universityLogoLabel');
+
+// 로고 업로드는 "방금 찾은 학교"를 기준으로 저장함. 입력창에 학교 이름이
+// 바뀔 때마다 지금 몇 번 학교용 업로드인지 라벨로 알려줌.
+let pendingLogoUnivKey = null;
+universityInput.addEventListener('input', () => {
+  const u = findUniversity(universityInput.value.trim());
+  pendingLogoUnivKey = u ? u.key : null;
+  universityLogoLabel.textContent = u
+    ? `"${u.englishName}" 로고 업로드 (선택)`
+    : '로고 업로드는 학교 이름을 먼저 입력해야 활성화돼요';
+  universityLogoInput.disabled = !u;
+});
+
+universityLogoInput.addEventListener('change', () => {
+  const file = universityLogoInput.files && universityLogoInput.files[0];
+  if (!file || !pendingLogoUnivKey) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    saveLogoOverride(pendingLogoUnivKey, reader.result);
+    universityStatus.textContent = '로고가 저장됐어요. "학교 프레임 생성"을 눌러 반영해주세요. (이 브라우저에 계속 저장되어 다음에도 자동으로 쓰여요)';
+  };
+  reader.readAsDataURL(file);
+});
+
+// 세로(1x4) 모드: stripFrameImg 전체를 학교색 배경 + 흰 사진칸으로 그리고,
+// 맨 아래 컬러 여백(footer)에 로고(업로드된 게 있으면 그것, 없으면 자체 제작
+// 이니셜 배지) + 영문 학교명을 나란히 배치함. 각 사진칸 모서리에 반복해서
+// 넣던 배지는 참고 이미지(Pickaboo)처럼 맨 아래 한 곳에만 넣도록 정리함.
+async function buildUniversityStripDataUrl(size, univ) {
+  const { W, H, pad, border, margin, chipW, chipH, photoW, photoH, footerH } = size;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = univ.color;
+  ctx.fillRect(0, 0, W, H);
+
+  for (let i = 0; i < 4; i++) {
+    const chipX = pad;
+    const chipY = pad + i * chipH;
+    const slotX = chipX + border - margin;
+    const slotY = chipY + border - margin;
+    const slotW = photoW + margin * 2;
+    const slotH = photoH + margin * 2;
+    ctx.fillStyle = '#ffffff';
+    roundRectPath(ctx, slotX, slotY, slotW, slotH, 4);
+    ctx.fill();
+  }
+
+  // ---- 맨 아래 컬러 여백: 로고 + 영문 학교명 ----
+  // 로고를 찾는 우선순위: (1) logos/{key}.png 로컬 파일(사용자가 직접 구해서
+  // 넣어둔 것, 매번 새로 올릴 필요 없이 자동으로 쓰임) -> (2) 브라우저에
+  // 업로드해서 저장해둔 것 -> (3) 없으면 자체 제작 이니셜 배지
+  const footerY = H - footerH;
+  const footerCenterY = footerY + footerH / 2;
+  let logoSize = Math.min(footerH * 0.62, 64);
+  let fontSize = Math.max(16, Math.round(logoSize * 0.46));
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  const title = univ.englishName;
+  const gap = 10;
+  // HUFS(HANKUK UNIVERSITY OF FOREIGN STUDIES)처럼 영문명이 아주 긴 학교는 위
+  // 크기 그대로 두면 캔버스 폭(W)을 넘어가서 잘릴 수 있어서, 넘치는 만큼 로고·
+  // 글자 크기를 비례해서 같이 줄임(짧은 학교명은 그대로 큼직하게 나옴).
+  const maxTotalW = W - 24;
+  let textWidth = ctx.measureText(title).width;
+  let totalW = logoSize + gap + textWidth;
+  if (totalW > maxTotalW) {
+    const scale = maxTotalW / totalW;
+    logoSize *= scale;
+    fontSize = Math.max(13, Math.round(fontSize * scale));
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    textWidth = ctx.measureText(title).width;
+    totalW = logoSize + gap + textWidth;
+  }
+  const startX = W / 2 - totalW / 2;
+  const logoX = startX;
+  const logoY = footerCenterY - logoSize / 2;
+
+  const logoImg = await resolveUniversityLogoImage(univ);
+  if (logoImg) {
+    ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+  } else {
+    drawUniversityFallbackBadge(ctx, logoX + logoSize / 2, footerCenterY, logoSize / 2, univ);
+  }
+
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(title, logoX + logoSize + gap, footerCenterY + 1);
+
+  return { dataUrl: c.toDataURL('image/png'), usedLogo: !!logoImg };
+}
+
+// 로고를 아직 안 올렸을 때 쓰는 자체 제작 대체 배지(실제 교표 아님 — 학교색
+// 원 안에 이니셜만 넣은 디자인이라 상표 문제 없이 바로 쓸 수 있음)
+// 로고 이미지를 우선순위대로 찾아서 로드된 Image 객체를 반환. 아무것도 없으면
+// null을 반환(호출부에서 대체 배지를 그림).
+// (1) logos/{key}.png|jpg|svg — 서버 폴더에 직접 넣어둔 파일. 파일이 없으면
+//     404가 나는데, 이건 정상적인 상황이라 콘솔 에러 없이 조용히 다음 단계로
+//     넘어가도록 이미지 로드 실패를 그냥 흡수함.
+// (2) 브라우저에 업로드해서 저장해둔 로고(localStorage)
+const LOGO_FILE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp'];
+async function tryLoadLocalLogoFile(key) {
+  for (const ext of LOGO_FILE_EXTENSIONS) {
+    try {
+      return await loadImage(`logos/${key}.${ext}`);
+    } catch {
+      // 이 확장자로는 없음 -> 다음 확장자 시도
+    }
+  }
+  return null;
+}
+async function resolveUniversityLogoImage(univ) {
+  const localLogo = await tryLoadLocalLogoFile(univ.key);
+  if (localLogo) return localLogo;
+
+  const uploaded = loadLogoOverrides()[univ.key];
+  if (uploaded) {
+    try {
+      return await loadImage(uploaded);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function drawUniversityFallbackBadge(ctx, cx, cy, r, univ) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.fillStyle = univ.color;
+  ctx.font = `bold ${Math.max(9, r * 0.75)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(univ.initial, cx, cy + 0.5);
+}
+
+async function generateUniversityFrame() {
+  const query = universityInput.value.trim();
+  if (!query) {
+    universityStatus.textContent = '학교 이름을 입력해주세요. 예: 고려대, 카이스트, 한양대';
+    return;
+  }
+  const univ = findUniversity(query);
+  if (!univ) {
+    universityStatus.textContent = `"${query}"에 해당하는 학교를 찾지 못했어요. 지원 목록에 있는 이름(또는 영문 약칭)으로 다시 입력해주세요.`;
+    return;
+  }
+
+  genUniversityBtn.disabled = true;
+  titleInput.value = univ.englishName;
+
+  if (selectedLayout === '2x2') {
+    // 2x2는 stripFrameImg를 쓰지 않고 별도의 배경색 입력(gridColorInput)을
+    // 그대로 재사용하는 구조라, 학교색 hex만 채워 넣으면 기존 렌더링에 그대로
+    // 반영됨. gridUniversity에 학교 정보를 저장해두면 composeGrid()가 1x4와 같은
+    // 로직(resolveUniversityLogoImage → 로고 또는 이니셜 배지)으로 제목 옆에
+    // 로고까지 그려줌.
+    document.getElementById('gridColorInput').value = univ.color;
+    gridUniversity = univ;
+    universityStatus.textContent = `"${univ.englishName}" 색상과 로고가 2x2 배경에 반영됐어요.`;
+    genUniversityBtn.disabled = false;
+    return;
+  }
+
+  framePreview.style.display = 'none';
+  const size = getStripVerticalSize();
+  const { dataUrl, usedLogo } = await buildUniversityStripDataUrl(size, univ);
+  stripFrameImg = await loadImage(dataUrl);
+  stripFrameRequestSize = { width: size.W, height: size.H };
+  universityFrameActive = true;
+  framePreview.src = dataUrl;
+  framePreview.style.display = 'block';
+  universityStatus.textContent = usedLogo
+    ? `"${univ.englishName}" 프레임 적용 완료! 로고가 반영됐어요.`
+    : `"${univ.englishName}" 프레임 적용 완료! (로고가 없어서 자체 제작 이니셜 배지로 대신했어요. logos/${univ.key}.png 파일을 넣거나 위에서 업로드하면 반영돼요)`;
+  frameStatus.textContent = '대학교 프레임이 적용됐어요.';
+  genUniversityBtn.disabled = false;
+}
+
+genUniversityBtn.addEventListener('click', generateUniversityFrame);
+universityInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); generateUniversityFrame(); }
+});
+// 사용자가 gridColorInput을 직접 고치면 더 이상 학교색이 아닐 수 있으니, 로고를
+// 계속 같이 그리지 않도록 gridUniversity를 해제함(학교 프레임 버튼으로 값을
+// 채울 때는 .value만 바꾸고 여기를 안 거치므로 영향 없음).
+document.getElementById('gridColorInput').addEventListener('input', () => {
+  gridUniversity = null;
+});
 
 // ---------- 4컷 합성 (제스처로 고른 사진 + AI 프레임) ----------
 async function composeFinal() {
@@ -2149,7 +2681,7 @@ async function composeFinal() {
 
   const images = await Promise.all(selectedIds.map(i => loadImage(capturedPhotos[i].dataUrl)));
   if (selectedLayout === '2x2') {
-    composeGrid(images);
+    await composeGrid(images);
   } else {
     composeVertical(images);
   }
@@ -2214,32 +2746,36 @@ function composeVertical(images) {
     }
   }
 
-  // 하단 라벨: 하트 + 제목 + 날짜
+  // 하단 라벨: 하트 + 제목 + 날짜. 대학교 프레임은 이 오버레이 대신 프레임
+  // 이미지 자체에 로고+영문명을 이미 그려뒀으므로 여기서는 건너뜀 (안 그러면
+  // 로고+영문명 위에 하트+제목이 또 겹쳐 그려짐)
   const footerY = H - footerH;
-  if (!hasFrame) {
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    roundRectPath(ctx, pad * 0.5, footerY + 10, W - pad, footerH - 26, 16);
-    ctx.fill();
+  if (!universityFrameActive) {
+    if (!hasFrame) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      roundRectPath(ctx, pad * 0.5, footerY + 10, W - pad, footerH - 26, 16);
+      ctx.fill();
+    }
+
+    ctx.textAlign = 'center';
+    [-30, 0, 30].forEach((dx) => drawHeart(ctx, W / 2 + dx, footerY + 40, 9, hasFrame ? '#ffffff' : '#ff5f96'));
+
+    ctx.save();
+    if (hasFrame) {
+      ctx.shadowColor = 'rgba(0,0,0,0.55)';
+      ctx.shadowBlur = 5;
+    }
+    ctx.fillStyle = hasFrame ? '#ffffff' : '#ff5f96';
+    ctx.font = 'bold 28px sans-serif';
+    const title = titleInput.value.trim() || 'StoryBooth';
+    ctx.fillText(title, W / 2, footerY + 76);
+
+    ctx.fillStyle = hasFrame ? '#ffffff' : '#a97b8c';
+    ctx.font = '14px sans-serif';
+    const dateStr = new Date().toLocaleDateString('ko-KR');
+    ctx.fillText(dateStr, W / 2, footerY + 98);
+    ctx.restore();
   }
-
-  ctx.textAlign = 'center';
-  [-30, 0, 30].forEach((dx) => drawHeart(ctx, W / 2 + dx, footerY + 40, 9, hasFrame ? '#ffffff' : '#ff5f96'));
-
-  ctx.save();
-  if (hasFrame) {
-    ctx.shadowColor = 'rgba(0,0,0,0.55)';
-    ctx.shadowBlur = 5;
-  }
-  ctx.fillStyle = hasFrame ? '#ffffff' : '#ff5f96';
-  ctx.font = 'bold 28px sans-serif';
-  const title = titleInput.value.trim() || 'StoryBooth';
-  ctx.fillText(title, W / 2, footerY + 76);
-
-  ctx.fillStyle = hasFrame ? '#ffffff' : '#a97b8c';
-  ctx.font = '14px sans-serif';
-  const dateStr = new Date().toLocaleDateString('ko-KR');
-  ctx.fillText(dateStr, W / 2, footerY + 98);
-  ctx.restore();
 }
 
 // 2x2 배경 색상 입력을 실제 rgb로 바꿈. 캔버스는 한글 색 이름을 이해하지
@@ -2304,8 +2840,10 @@ function rgbToCss({ r, g, b }) {
 
 // 2x2는 AI 프레임 생성 기능 없이 항상 깔끔한 기본 디자인(그라데이션 + 반짝이 +
 // 흰 사진 카드)만 사용함. 배경색은 gridColorInput에 적은 값(한글/영어/hex)을
-// 따라가고, 안 적으면 기존 기본 핑크로 나감.
-function composeGrid(images) {
+// 따라가고, 안 적으면 기존 기본 핑크로 나감. gridUniversity가 있으면(학교 프레임
+// 버튼으로 색을 채운 경우) 1x4와 같은 로직(resolveUniversityLogoImage)으로 제목
+// 옆에 로고도 그림 — 로고 로드가 비동기라 이 함수도 async로 바꿈.
+async function composeGrid(images) {
   const size = getStripGridSize();
   const { photoW, photoH, border, margin, chipW, chipH, stripW, outerPad, colGap, footerH, W, H } = size;
 
@@ -2357,11 +2895,36 @@ function composeGrid(images) {
     ctx.restore();
   });
 
-  ctx.fillStyle = inkCss;
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   ctx.font = 'bold 20px sans-serif';
   const title = (titleInput.value.trim() || 'StoryBooth').toUpperCase();
-  ctx.fillText(title, W / 2, H - footerH / 2 + 6);
+  const footerCenterY = H - footerH / 2;
+
+  if (gridUniversity) {
+    // 1x4의 buildUniversityStripDataUrl과 같은 배치: 로고 + 영문명을 한 덩어리로
+    // 보고 그 전체 폭을 가운데 정렬한 뒤, 로고는 왼쪽에 그리고 글자는 로고 오른쪽에
+    // 왼쪽 정렬로 이어 붙임.
+    const logoSize = Math.min(footerH * 0.6, 56);
+    const textWidth = ctx.measureText(title).width;
+    const gap = 10;
+    const totalW = logoSize + gap + textWidth;
+    const logoX = W / 2 - totalW / 2;
+
+    const logoImg = await resolveUniversityLogoImage(gridUniversity);
+    if (logoImg) {
+      ctx.drawImage(logoImg, logoX, footerCenterY - logoSize / 2, logoSize, logoSize);
+    } else {
+      drawUniversityFallbackBadge(ctx, logoX + logoSize / 2, footerCenterY, logoSize / 2, gridUniversity);
+    }
+
+    ctx.fillStyle = inkCss;
+    ctx.textAlign = 'left';
+    ctx.fillText(title, logoX + logoSize + gap, footerCenterY + 1);
+  } else {
+    ctx.fillStyle = inkCss;
+    ctx.fillText(title, W / 2, footerCenterY);
+  }
 }
 
 composeBtn.addEventListener('click', composeFinal);

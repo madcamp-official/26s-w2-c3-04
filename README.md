@@ -22,8 +22,8 @@
 
 | 이름 | 학교 | GitHub | 역할 |
 |---|---|---|---|
-| 정유진 | 고려대 | yujin923 |  |
-| 양호성 | 카이스트 | hoseong02 |  |
+| 정유진 | 고려대 | yujin923 | 손동작 인식 파트 구현, 프레임 생성 파트 개선, UI, 배포 |
+| 양호성 | 카이스트 | hoseong02 | 프레임 생성 파트 구현, 손동작 인식 파트 개선, 백엔드 |
 
 ---
 
@@ -37,44 +37,73 @@
 
 ## 기획안
 
-- **산출물 주제:**
-- **제작 목적:**
-- **선택 옵션:**
+- **산출물 주제:** AI 인생네컷 — 자동으로 포즈를 제안 후 손동작을 인식해 자동 촬영, 원하는 테마에 맞는 프레임을 자동 생성해주는 웹 기반 네컷 사진 서비스
+- **제작 목적:** 네컷 사진은 찍고 싶은데 포즈랑 프레임 정하는 게 귀찮은 사람들을 위해!
+- **선택 옵션:** LLM Wrapper
 - **핵심 구현 요소:**
-  -
-  -
-  -
+  - MediaPipe HandLandmarker 기반 손동작 인식 — 지정 포즈(브이, 하트, 꽃받침 등 11종)를 취하면 자동으로 카운트다운·촬영
+  - Cloudflare Workers AI 연동 — 자유 텍스트 테마를 LLM으로 영어 모티프 키워드로 변환하고, 인페인팅 모델로 네컷 프레임 이미지를 생성
 - **사용 / 시연 시나리오:**
+  1. 웹 페이지 접속 후 카메라 권한 허용
+  2. 화면에 안내된 포즈를 취하면 인식 → 카운트다운 → 자동 촬영 (반복 촬영)
+  3. 찍힌 사진 중 마음에 드는 4장 선택
+  4. 원하는 프레임 테마 선택 or  원하는 스타일 자유 텍스트로 입력 (예: "숲속에서 찍은 느낌") or 대학교 프레임 선택 → AI가 프레임 생성
+  5. 4컷 합성 결과 확인 후 이미지 다운로드
 - **팀원별 역할:**
+  - 정유진: 손동작 인식 프로토타입 구현, 프론트·백엔드 통합, AWS App Runner 배포
+  - 양호성: AI 네컷 프로토타입·프레임 생성(Cloudflare Workers AI) 연동, Express 백엔드 구현, 손동작 인식 개선
 
 ### 개발 일정
 
 | 날짜 | 목표 |
 |---|---|
-| Day 1 | 아이디어 선정 및 기획 |
-| Day 2 | 기본적인 웹 캠 기능 구현 |
-| Day 3 |  |
-| Day 4 |  |
-| Day 5 |  |
-| Day 6 |  |
-| Day 7 |  |
+| Day 1 | 아이디어 선정 |
+| Day 2 | 아이디어 구체화 및 손동작 인식 프로토타입 + AI 네컷 프로토타입 제작 |
+| Day 3 | 손동작 종류 확정, 프레임 생성 프롬프트 베이스라인 작성 |
+| Day 4 | 손동작 인식 개선, AI 프레임 생성(인페인팅) 프롬프트·품질 개선 |
+| Day 5 | 손동작 인식 / 프레임 생성 통합, Express 백엔드 구현, 손동작 인식 개선 |
+| Day 6 | AWS App Runner 배포, UI 개선, 프레임 생성 프롬프트 개선, 손동작 인식 개선 완료|
+| Day 7 | 최종 완성 |
 
 ---
 
 ## 구현 명세서
 
-| 구현 요소 | 설명 | 우선순위 |
-|---|---|---|
-|  |  | 필수 |
-|  |  | 필수 |
-|  |  | 선택 |
-|  |  | 선택 |
+| 구현 요소 | 설명 |
+|---|---|
+| 손동작 인식 자동 촬영 | MediaPipe HandLandmarker로 손 랜드마크를 추적하고, 포즈 판정 시 카운트다운 후 자동 촬영 |
+| AI 프레임 생성 | Cloudflare Workers AI 인페인팅 모델로 테마에 맞는 네컷 프레임 이미지 생성 |
+| 테마 프리셋 선택 | 우주·생일·하트·심플·크리스마스·바다 등 프리셋 버튼으로 프레임 테마 선택 |
+| 자유 테마 키워드 변환 | 사용자가 입력한 한국어 자유 테마를 LLM이 영어 모티프 키워드로 변환 |
+| 스타일 참고 이미지 반영 | 원하는 색감·분위기의 이미지를 업로드하면 그 톤과 구도를 반영해 프레임 생성 |
+| 대학교 로고 프레임 | 학교 이름을 입력하면 학교 고유 색상 + 로고를 프레임 하단에 자동으로 넣어 생성 |
+| AWS 배포 | Express 백엔드를 AWS App Runner에 배포, Cloudflare 인증값은 Secrets Manager로 관리 |
+| 4컷 합성·다운로드 | 촬영 사진 4장을 생성된 프레임과 캔버스에서 합성해 다운로드 |
+
 
 ---
 
 ## 아키텍처
 
-<!-- 실시간 인터랙션: WebSocket/SSE/WebRTC 구조도 / LLM Wrapper: API 연동 흐름도 / Cross-Platform: 플랫폼 구성도 -->
+```text
+브라우저 (public_index.html)
+  ├─ MediaPipe HandLandmarker 손동작 인식
+  ├─ 웹캠 촬영 · 사진 선택
+  ├─ 프레임 베이스 이미지 · 마스크 생성
+  ├─ POST /api/theme-keywords   (자유 테마 → 영어 키워드)
+  └─ POST /api/generate-frame   (프레임 이미지 생성 요청)
+             ↓
+AWS App Runner (server.js, Express)
+  ├─ 정적 페이지 제공
+  ├─ 요청 검증 · 타임아웃 · 오류 처리
+  └─ 서버에 보관한 Cloudflare 인증값으로 외부 API 호출
+             ↓
+Cloudflare Workers AI
+  ├─ LLM: 자유 테마를 영어 모티프 키워드로 변환
+  └─ 인페인팅 모델: 네컷 프레임 이미지 생성
+```
+
+사진, 동작 인식 결과, 생성 이미지는 서버에 저장하지 않으며(무상태 백엔드), 최종 합성과 다운로드는 모두 브라우저에서 수행합니다. 자세한 변경 경계는 [test/ARCHITECTURE.md](test/ARCHITECTURE.md) 참고.
 
 ---
 
@@ -84,49 +113,60 @@
 
 ### 화면 / 인터페이스 설계
 
-<!-- Figma 링크, 화면 이미지, CLI 사용 예시, 앱 화면 등 -->
+단일 페이지 웹 앱 ([test/public_index.html](test/public_index.html)) 흐름:
+
+1. 카메라 미리보기 + 포즈 안내 → 2. 자동 촬영 → 3. 사진 4장 선택 → 4. 테마 입력·프레임 생성 → 5. 4컷 합성 결과·다운로드
 
 ### 데이터 구조
 
-<!-- DB 스키마, JSON 구조, 파일 저장 방식 등 -->
+- DB 없음, 서버 파일 저장 없음
+- 사진·마스크는 Base64 PNG로 브라우저 ↔ 서버 간 JSON으로만 전달 (요청 최대 25MB)
+- Cloudflare 인증값은 서버 환경변수(`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`)로만 관리하며 클라이언트에 노출되지 않음
 
 ### API / 외부 서비스 연동
 
 | Method / 방식 | Endpoint / 서비스 | 설명 | 요청 | 응답 | 비고 |
 |---|---|---|---|---|---|
-|  |  |  |  |  |  |
+| POST | `/api/theme-keywords` | 자유 테마를 영어 모티프 키워드로 변환 | `{ "text": "숲속에서 찍은 느낌" }` | `{ "keywords": "a small pine tree, ..." }` | 내부에서 Cloudflare LLM 호출 |
+| POST | `/api/generate-frame` | 인페인팅으로 네컷 프레임 이미지 생성 | `prompt, negativePrompt, width, height, image, mask, seed, strength, guidance` | `{ "image": "Base64", "mime": "image/png" }` | 타임아웃 100초, 본문 최대 25MB |
+| GET | `/health` | 서버 상태 확인 (AWS App Runner 헬스 체크) | - | `{ "status": "ok" }` | - |
+| 외부 API | Cloudflare Workers AI | LLM 키워드 변환 + 인페인팅 이미지 생성 | 서버에서만 호출 | - | 토큰은 서버 측 보관 |
 
 ---
 
 ## 산출물 및 실행 방법
 
-- **산출물 설명:**
-- **실행 환경:**
-- **실행 방법:**
+- **산출물 설명:** 손동작 인식으로 자동 촬영하고 AI가 프레임을 생성해주는 웹 네컷 사진 부스. 프론트엔드(`test/public_index.html`) + Express 백엔드(`test/server.js`)로 구성되며 AWS App Runner에 배포됨
+- **실행 환경:** 최신 데스크톱 브라우저(웹캠 필요) + Node.js 22 이상
+- **실행 방법:** 아래 참고 (상세 안내는 [test/README.md](test/README.md))
 - **시연 영상 / 이미지:** (선택)
 
 ### 실행 방법
 
 ```bash
-# 환경 설정
+cd test
+
+# 환경 설정 (.env에 Cloudflare 계정 ID / API 토큰 입력)
 cp .env.example .env
 
 # 의존성 설치
-npm install   # 또는 pip install -r requirements.txt 등
+npm install
 
 # 실행
-npm run dev   # 또는 python main.py 등
+npm start
 ```
+
+브라우저에서 `http://localhost:8787/` 접속. (HTML 파일을 더블클릭해 `file://`로 열면 API 연결이 안 됩니다.)
 
 ### 기술 구성
 
 | 분류 | 사용 기술 |
 |---|---|
-| 핵심 기술 |  |
-| 실행 환경 |  |
-| 데이터 저장 |  |
-| 외부 API / 서비스 |  |
-| 기타 |  |
+| 핵심 기술 | MediaPipe Tasks Vision (HandLandmarker), Canvas API, Vanilla JS |
+| 실행 환경 | 브라우저(프론트) + Node.js 22 / Express (백엔드), AWS App Runner 배포 |
+| 데이터 저장 | 없음 (무상태 — DB·서버 파일 저장 미사용) |
+| 외부 API / 서비스 | Cloudflare Workers AI (LLM 키워드 변환, 인페인팅 이미지 생성) |
+| 기타 | AWS Secrets Manager (Cloudflare 인증값 보관), dotenv |
 
 ---
 

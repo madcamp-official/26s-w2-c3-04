@@ -134,10 +134,7 @@ Cloudflare Workers AI
 
 ---
 
-## 산출물 및 실행 방법
-
-- **산출물 설명:** 손동작 인식으로 자동 촬영하고 AI가 프레임을 생성해주는 웹 네컷 사진 부스. 프론트엔드(`test/public_index.html`) + Express 백엔드(`test/server.js`)로 구성되며 AWS App Runner에 배포됨
-- **실행 환경:** 최신 데스크톱 브라우저(웹캠 필요) + Node.js 22 이상
+## 실행 방법
 - **실행 방법:** 아래 참고 (상세 안내는 [test/README.md](test/README.md))
 - **시연 영상 / 이미지:** (선택)
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera, Sparkles, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface StartScreenProps {
@@ -28,32 +28,21 @@ export function StartScreen({ onStart }: StartScreenProps) {
         style={{ background: 'radial-gradient(circle, #C5D9BF, transparent)' }}
       />
 
-      {/* Logo */}
+      {/* Logo — same static title style as the shooting screen header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="flex flex-col items-center mb-10"
       >
-        <div
-          className="w-20 h-20 rounded-3xl flex items-center justify-center mb-4 shadow-lg"
-          style={{ background: 'linear-gradient(135deg, #E8869F, #D8708C)' }}
-        >
-          <Camera color="#FFFFFF" size={36} />
-        </div>
         <h1
-          className="tracking-tight text-[#3C2A35]"
-          style={{ fontFamily: 'Poppins, sans-serif', fontSize: '2.5rem', fontWeight: 700, letterSpacing: '-0.02em' }}
+          style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: '2.5rem', color: '#3C2A35' }}
         >
           StoryBooth
         </h1>
-        <div className="flex items-center gap-2 mt-2">
-          <Sparkles size={14} color="#E8869F" />
-          <p style={{ color: '#9B7A8A', fontSize: '0.95rem' }}>
-            손동작만으로 찍는 나만의 인생네컷
-          </p>
-          <Sparkles size={14} color="#E8869F" />
-        </div>
+        <p style={{ color: '#9B7A8A', fontSize: '0.95rem', marginTop: '0.5rem' }}>
+          손동작만으로 찍는 나만의 인생네컷
+        </p>
       </motion.div>
 
       {/* Layout Selection */}

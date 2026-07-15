@@ -6,7 +6,7 @@
 <title>StoryBooth</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Noto+Sans+KR:wght@400;500;600;700&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
 <style>
   /* Figma "Design StoryBooth UI" 팀에서 만든 디자인(figma_ui)의 색/타이포/카드
      스타일을 이 페이지에 입힘. 촬영 화면(.stage-wrap/.status-bar/.grid8)만은
@@ -158,13 +158,9 @@
     margin-top: 20px;
     text-align: center;
     display: inline-block;
-    padding: 16px;
-    background: #FFFFFF;
-    border-radius: 20px;
-    border: 1px solid rgba(232, 134, 159, 0.15);
-    box-shadow: 0 20px 40px rgba(60, 42, 53, 0.12);
   }
   #finalCanvas { max-width: 320px; border-radius: 10px; display: block; }
+  #livePreviewCanvas { max-width: 220px; width: 100%; border-radius: 10px; display: inline-block; box-shadow: 0 4px 16px rgba(60, 42, 53, 0.12); }
   .error-box {
     background: #FDE8EF; color: #C2426A;
     padding: 12px 16px; border-radius: 14px;
@@ -271,14 +267,6 @@
   .option-card summary:hover {
     color: #3C2A35;
   }
-  .option-preview {
-    width: 100%;
-    max-width: 200px;
-    display: none;
-    border: 0;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(60, 42, 53, 0.1);
-  }
   .style-ref-thumb {
     width: 40px;
     height: 40px;
@@ -287,11 +275,107 @@
     border: 1.5px solid rgba(232, 134, 159, 0.25);
     display: none;
   }
+  .intro-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 32%, #FFF0F6 0%, #FFDDEB 55%, #FFCBE1 100%);
+  }
+  .intro-stage { position: relative; display: flex; flex-direction: column; align-items: center; gap: 30px; }
+
+  .intro-sparkles { position: absolute; inset: -8% -6%; pointer-events: none; }
+  .intro-sparkles > * { position: absolute; }
+  .intro-star { clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); }
+  .intro-s1 { top: 2%;  left: 4%;   width: 26px; height: 26px; background: #FF8FBF; animation: sb-twinkle 2.4s ease-in-out infinite; }
+  .intro-s2 { top: 8%;  right: 3%;  width: 40px; height: 40px; background: #FFFFFF; animation: sb-twinkle 3s   ease-in-out infinite .5s; }
+  .intro-s3 { bottom: 6%;  left: 1%; width: 34px; height: 34px; background: #FFFFFF; animation: sb-twinkle 2.6s ease-in-out infinite 1s; }
+  .intro-s4 { bottom: 14%; right: 5%; width: 22px; height: 22px; background: #FF6FA5; animation: sb-twinkle 2.8s ease-in-out infinite 1.4s; }
+  .intro-s5 { top: 46%; left: -2%; width: 14px; height: 14px; border-radius: 50%; background: #FFB3D1; animation: sb-twinkle 2.2s ease-in-out infinite .8s; }
+  .intro-s6 { top: 30%; right: -1%; width: 16px; height: 16px; border-radius: 50%; background: #FFFFFF; animation: sb-twinkle 2.5s ease-in-out infinite .3s; }
+
+  .intro-wordmark { position: relative; display: inline-block; animation: sb-pop .7s cubic-bezier(.18,1.3,.55,1) both; }
+  .intro-bob { position: relative; display: inline-block; animation: sb-bob 4.5s ease-in-out infinite .7s; }
+  .intro-word { font-family: 'Fredoka', sans-serif; font-size: clamp(56px, 11vw, 140px); font-weight: 700; letter-spacing: -.01em; line-height: .95; }
+  .intro-word.outline {
+    position: absolute; inset: 0; color: #FF6FA5;
+    -webkit-text-stroke: 0.09em #FFFFFF; paint-order: stroke fill;
+    filter: drop-shadow(0 0.07em 0 #F49BC4) drop-shadow(0 0.16em 0.16em rgba(214,74,132,.35));
+  }
+  .intro-word.fill {
+    position: relative;
+    background: linear-gradient(180deg, #FF9AC5 0%, #FF6BA6 55%, #FB4E92 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-fill-color: transparent;
+  }
+
+  .intro-start-btn {
+    animation: sb-pop .7s cubic-bezier(.18,1.3,.55,1) both .18s;
+    margin-top: 0;
+    border: 0.14em solid #FFFFFF; cursor: pointer;
+    background: linear-gradient(180deg, #FF7FB6 0%, #FB4E92 100%);
+    color: #FFFFFF; font-family: 'Fredoka', sans-serif; font-weight: 700;
+    font-size: clamp(18px, 2.4vw, 26px); letter-spacing: .01em;
+    padding: 16px 40px; border-radius: 999px;
+    box-shadow: 0 0.16em 0 #C93A73, 0 0.3em 0.4em rgba(180,50,105,.4);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .intro-start-btn:hover { transform: translateY(-3px); box-shadow: 0 0.22em 0 #C93A73, 0 0.4em 0.5em rgba(180,50,105,.45); }
+  .intro-start-btn:active { transform: translateY(0.1em); box-shadow: 0 0.05em 0 #C93A73, 0 0.1em 0.2em rgba(180,50,105,.4); }
+
+  @keyframes sb-pop {
+    0%   { transform: scale(.4) rotate(-8deg); opacity: 0; }
+    60%  { transform: scale(1.08) rotate(2deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  @keyframes sb-bob {
+    0%, 100% { transform: translateY(0) rotate(-1deg); }
+    50%      { transform: translateY(-14px) rotate(1deg); }
+  }
+  @keyframes sb-twinkle {
+    0%, 100% { transform: scale(.4) rotate(0deg); opacity: .2; }
+    50%      { transform: scale(1) rotate(45deg); opacity: 1; }
+  }
+
+  /* 촬영 화면 상단 타이틀: 새 핑크 디자인의 색만 입힘 — 여기선 움직이지 않음 */
+  #mainTitle {
+    font-family: 'Fredoka', sans-serif;
+    background: linear-gradient(180deg, #FF9AC5 0%, #FF6BA6 55%, #FB4E92 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-fill-color: transparent;
+  }
 </style>
 </head>
 <body>
 
-<h1>StoryBooth</h1>
+<div id="introOverlay" class="intro-overlay">
+  <div class="intro-stage">
+    <div class="intro-sparkles" aria-hidden="true">
+      <div class="intro-star intro-s1"></div>
+      <div class="intro-star intro-s2"></div>
+      <div class="intro-star intro-s3"></div>
+      <div class="intro-star intro-s4"></div>
+      <div class="intro-s5"></div>
+      <div class="intro-s6"></div>
+    </div>
+    <div class="intro-wordmark">
+      <div class="intro-bob">
+        <span class="intro-word outline" aria-hidden="true">StoryBooth</span>
+        <span class="intro-word fill">StoryBooth</span>
+      </div>
+    </div>
+    <button id="introStartBtn" type="button" class="intro-start-btn">촬영 시작하기</button>
+  </div>
+</div>
+<script>
+  document.getElementById('introStartBtn').addEventListener('click', function () {
+    document.getElementById('introOverlay').style.display = 'none';
+  });
+</script>
+
+<h1 id="mainTitle">StoryBooth</h1>
 
 <div id="app">
   <div class="stage-wrap" id="captureStage">
@@ -326,9 +410,8 @@
     <div class="theme-chip-row" id="themeChipRow">
       <button type="button" class="theme-chip" data-theme="space">🚀 우주</button>
       <button type="button" class="theme-chip" data-theme="birthday">🎂 생일</button>
-      <button type="button" class="theme-chip" data-theme="heart">💗 하트</button>
-      <button type="button" class="theme-chip" data-theme="simple">⬜ 심플</button>
-      <button type="button" class="theme-chip" data-theme="christmas">🎄 크리스마스</button>
+      <button type="button" class="theme-chip" data-theme="simple">⬜ 단색</button>
+      <button type="button" class="theme-chip" data-theme="winter">❄️ 겨울</button>
       <button type="button" class="theme-chip" data-theme="travel">🌊 바다</button>
     </div>
     <div class="theme-chip-row" id="simpleColorRow" style="display:none;">
@@ -364,14 +447,14 @@
     </div>
     <div class="option-status" id="styleRefStatus">선택 사항: 색감·분위기를 따라 하고 싶은 참고 이미지를 올리면 그 톤에 맞춰 테두리를 생성해요.</div>
     <div class="row">
-      <input type="text" id="titleInput" placeholder="제목 텍스트" value="StoryBooth" autocomplete="off" />
+      <input type="text" id="titleInput" placeholder="제목 텍스트" value="StoryBooth" maxlength="36" autocomplete="off" />
     </div>
+    <div class="option-status">제목(ex-photoism 기본값: StoryBooth) 최대 36자까지 입력 가능</div>
     <div class="row">
       <button id="genFrameBtn" style="flex:1">프레임 생성</button>
       <button class="btn-secondary" id="clearFrameBtn">기본으로</button>
     </div>
     <div class="option-status" id="frameStatus">사진 자리 4개가 뚫린 긴 1×4 프레임을 하나로 이어서 생성해요.</div>
-    <img class="option-preview" id="framePreview" alt="생성된 프레임 미리보기" />
   </div>
   <div class="option-card" id="gridColorPanel" style="display:none;">
     <h2>🎨 2x2 배경 색상</h2>
@@ -379,6 +462,13 @@
       <input type="text" id="gridColorInput" placeholder="예: 핑크, 하늘색, 노랑, blue, #3498db" />
     </div>
     <div class="option-status">AI 프레임 없이 깔끔한 배경색만 적용돼요. 한글로 적어도 되고, 비워두면 기본 핑크로 나가요.</div>
+  </div>
+
+  <!-- 1x4/2x2 공통 미리보기 자리. frameGenPanel과 gridColorPanel은 레이아웃에 따라
+       서로 배타적으로 display:none 처리되므로, 그 사이 이 자리 하나만 둬도
+       항상 "현재 보이는 패널 바로 아래"에 자연스럽게 나온다. -->
+  <div id="livePreviewWrap" style="display:none; text-align:center; margin: 14px 0;">
+    <canvas id="livePreviewCanvas"></canvas>
   </div>
 
   <div class="option-card" id="universityPanel">
@@ -391,6 +481,7 @@
       <label id="universityLogoLabel" style="font-size:12px;color:#8a7580;flex:1;">로고 업로드는 학교 이름을 먼저 입력해야 활성화돼요</label>
       <input type="file" id="universityLogoInput" accept="image/*" disabled style="flex:1;min-width:0;font-size:12px;" />
     </div>
+    <div class="option-status" id="universityStatus">학교 이름을 입력하고 "학교 프레임 생성"을 누르면 학교색 배경 + 로고(또는 이니셜 배지) + 영문명이 반영된 프레임이 만들어져요.</div>
   </div>
 
 
@@ -484,7 +575,7 @@ const GUIDE_CAPTION = {
   v: '검지·중지를 펴서 브이 모양',
   thumbsup: '엄지만 세우고 나머지 손가락은 접기',
   tigerclaw: '손바닥이 보이게 들고, 손톱이 보일 정도로만 손가락을 살짝 구부리기',
-  catears: '손목을 머리 위로 들고 손등이 보이게, 검지·중지를 벌려 손톱이 머리에 닿도록 굽히기 (한 손 OK)',
+  catears: '손목을 머리 위로 들고 손등이 보이게, 검지·중지를 벌려 손톱이 머리에 닿도록 굽히기 — 머리 위에 거꾸로 브이 하는 느낌 (한 손 OK)',
   cheekheart: '엄지는 아래로, 나머지 네 손가락은 살짝 구부려 반원 모양으로 볼(입 높이 또는 그 위)에 대기 (한 손 OK)',
   bigheart: '양손을 둥글게 구부려 검지 끝은 위에서, 엄지 끝은 아래에서 맞닿게 하트 만들기',
   flower: '손가락을 붙여 편 손으로 턱 밑을 컵처럼 받치기 (한 손 OK, 양손도 가능)',
@@ -695,24 +786,28 @@ function tigerClawComponent(lm, handednessLabel) {
   });
 }
 
-// 고양이 귀: 검지·중지를 곧게 편 채로 넓게 벌려서(V보다 더 벌어진 삼각형 모양), 손목이
-// 손끝보다 위(더 높은 곳)에 있도록 손을 뒤집어(손등이 보이게) 손끝이 머리에 닿는 모양.
-// (직전 버전은 손목-손끝 위아래 관계를 안 봐서, 손가락이 위로 향한 일반 브이 사인도
-//  똑같이 통과돼버렸음. "손목이 손끝보다 위에 있는지"만 다시 검사해서 방향을 구분함 -
-//  손목/손끝 두 점만 비교하므로, 팔 전체가 대각선으로 들려도 흔들리지 않음)
+// 고양이 귀: 손목을 꼭짓점으로 검지·중지가 선명한 V자를 만들고, 그 V가 머리 쪽
+// 아래를 향하는 모양. V자 형성을 핵심으로 보고 나머지 손가락과 방향 조건은 느슨하게 둔다.
 function catEarsComponent(lm) {
-  // 검지·중지가 곧게 펴져 있는지 (완전히 편 손가락은 관절 각도가 180도에 가까움)
-  const indexStraight = fingerBendAngle(lm, 5, 6, 8) > 140;
-  const middleStraight = fingerBendAngle(lm, 9, 10, 12) > 140;
-  if (!indexStraight || !middleStraight) return false;
+  // 핵심 조건은 손목을 꼭짓점으로 검지·중지가 만드는 V자다. 두 손가락은
+  // 완전히 곧을 필요 없이, V의 두 변으로 보일 정도로만 펴져 있으면 된다.
+  const indexAngle = fingerBendAngle(lm, 5, 6, 8);
+  const middleAngle = fingerBendAngle(lm, 9, 10, 12);
+  const indexUsable = indexAngle > 110;
+  const middleUsable = middleAngle > 110;
 
-  // 약지·소지는 주먹처럼 접혀야 함 (관절 각도 기준, 회전에 영향받지 않음)
-  const ringCurl = fingerBendAngle(lm, 13, 14, 16) < 140;
-  const pinkyCurl = fingerBendAngle(lm, 17, 18, 20) < 140;
+  // 약지·소지는 완전히 주먹처럼 접지 않아도 된다. 각도 또는 손목거리 중
+  // 하나만 접힌 모양이면 인정해 V자 판정을 방해하지 않게 한다.
+  const ringCurl = fingerBendAngle(lm, 13, 14, 16) < 160 || curlRatio(lm, 16, 13) < 1.45;
+  const pinkyCurl = fingerBendAngle(lm, 17, 18, 20) < 160 || curlRatio(lm, 20, 17) < 1.45;
 
-  // 손목(0)이 검지·중지 손끝보다 위(작은 y)에 있어야 함 = 손등 쪽이 위, 손끝이 머리 쪽 아래
-  // (일반 브이 사인처럼 손가락이 손목보다 위로 향하면 이 조건에서 걸러짐)
-  const wristAboveFingers = lm[0].y < lm[8].y && lm[0].y < lm[12].y;
+  // 일반 브이와 구분하는 보조 조건. 두 손끝 각각을 강제하지 않고, V의 중심이
+  // 손목보다 아래를 향하는지만 길이 비율로 느슨하게 확인한다.
+  const tipMid = { x: (lm[8].x + lm[12].x) / 2, y: (lm[8].y + lm[12].y) / 2 };
+  const centerDx = tipMid.x - lm[0].x;
+  const centerDy = tipMid.y - lm[0].y;
+  const downwardRatio = centerDy / (Math.hypot(centerDx, centerDy) || 0.001);
+  const pointsDown = downwardRatio > 0.1;
 
   // 손목(0)을 꼭짓점으로 검지 끝(8)·중지 끝(12)까지의 벌어진 각도
   const v1 = { x: lm[8].x - lm[0].x, y: lm[8].y - lm[0].y };
@@ -720,15 +815,19 @@ function catEarsComponent(lm) {
   const mag1 = Math.hypot(v1.x, v1.y), mag2 = Math.hypot(v2.x, v2.y);
   const cosA = (v1.x * v2.x + v1.y * v2.y) / (mag1 * mag2 || 1);
   const angleDeg = Math.acos(Math.min(1, Math.max(-1, cosA))) * 180 / Math.PI;
-  const angleOk = angleDeg > 10; // 브이 사인보다 넉넉히 벌어져 있으면 인정 (상한 없음)
+  const angleOk = angleDeg > 12; // V가 눈에 보일 정도의 최소 벌어짐만 요구
 
-  // (예전엔 손끝이 화면 상위 60% 안에 있어야 하는 nearHead 조건이 있었으나 제거함.
-  //  화면 절대좌표 기준이라 사람이 프레임 어디에 잡히느냐에 따라 같은 동작이
-  //  통과/탈락이 갈렸음. 얼굴 좌표를 실제로 감지하지 않는 이상 "머리 근처"를
-  //  화면 위치로 추정할 수 없고, 손을 뒤집는 wristAboveFingers 조건이 이미
-  //  이 포즈의 방향 특징을 충분히 구분해준다.)
+  // 얼굴 랜드마크를 감지하지 않으므로 화면 상단 같은 절대 위치 조건은 두지 않는다.
+  // 대신 V 중심의 아래방향만 일반 브이와 구분하는 최소 보조 조건으로 사용한다.
 
-  return ringCurl && pinkyCurl && indexStraight && middleStraight && wristAboveFingers && angleOk;
+  if (DEBUG_POSE) {
+    window.__poseDebug =
+      `고양이귀 · V각도(12도 초과): ${angleDeg.toFixed(0)}도` +
+      ` · 검지/중지 각도(110도 초과): ${indexAngle.toFixed(0)} / ${middleAngle.toFixed(0)}` +
+      ` · V중심 아래방향비(0.1 초과): ${downwardRatio.toFixed(2)}` +
+      ` · 약지/소지 접힘: ${ringCurl ? 'O' : 'X'} / ${pinkyCurl ? 'O' : 'X'}`;
+  }
+  return angleOk && indexUsable && middleUsable && pointsDown && ringCurl && pinkyCurl;
 }
 
 // 볼하트: 엄지와 검지를 붙이지 않고, 살짝 구부려 반쪽 하트(둥근 곡선) 모양을 만들어
@@ -742,7 +841,11 @@ function catEarsComponent(lm) {
 // 하한만 두면(이전 0.05) 손바닥을 정면으로 활짝 돌린 부자연스러운 자세는
 // 무제한 통과하고, 반대로 손이 조금만 돌아가면 바로 탈락하는 비대칭이 생김.
 // -> 살짝 돌아간 것(음수 소폭)은 허용하고, 정면으로 활짝 편 것(큰 양수)은 거른다.
-const CHEEK_PALM_FACING_MIN = -0.25;
+// 범위를 대칭(-0.5~0.5)으로 둔다: 이 점수는 왼손/오른손 라벨에 의존하는데,
+// 거울 모드에서 라벨이 틀리면 부호가 뒤집힌다. 비대칭 범위(-0.25~0.5)일 땐
+// 대칭인 양손 볼하트에서 한 손만 부호가 뒤집혀 탈락하는 증상이 있었다.
+// 대칭 범위면 부호가 뒤집혀도 판정이 같아져 라벨 오류에 면역이 된다.
+const CHEEK_PALM_FACING_MIN = -0.5;
 const CHEEK_PALM_FACING_MAX = 0.5;
 
 function cheekHeartComponent(lm, handednessLabel) {
@@ -1143,8 +1246,69 @@ function makePairChecker(pairFn, label) {
   };
 }
 
+// 볼하트 최종 판정: 감지된 모든 손이 볼하트 모양이어야 하고, 추가로 그중 두
+// 손의 검지 끝과 엄지 끝이 각각 맞붙어 양손하트의 두 접점을 만들면 탈락시킨다.
+// 양손하트의 각 손이 곧 "살짝 굽힌 반쪽 하트"라서 손 하나씩만 보면 볼하트와
+// 구분되지 않아, 양손하트 자세가 볼하트로도 오인식되는 문제가 있었다.
+// 손 중심 거리는 쓰지 않으므로, 정상 양손 볼하트가 서로를 향하고 있어도 손끝이
+// 실제로 떨어져 있으면 통과한다.
+function cheekHeartChecker(hands, handednesses) {
+  if (hands.length < 1) return false;
+  // 손이 여러 개일 때 마지막 손의 디버그만 남으면 "어느 손이 왜 떨어졌는지"가
+  // 안 보이므로, 손마다 판정 결과와 내부 값을 모아서 한 줄로 합쳐 남긴다.
+  const debugs = [];
+  lastPairPerHandOk = hands.map((lm, i) => {
+    const ok = cheekHeartComponent(lm, handednesses ? handednesses[i] : undefined);
+    if (DEBUG_POSE && window.__poseDebug) {
+      debugs.push(`[손${i + 1} ${ok ? 'O' : 'X'}] ${window.__poseDebug}`);
+      window.__poseDebug = null;
+    }
+    return ok;
+  });
+  const perHandDebug = DEBUG_POSE ? debugs.join(' ‖ ') : null;
+  if (DEBUG_POSE) window.__poseDebug = perHandDebug;
+  if (!lastPairPerHandOk.every(Boolean)) return false;
+  // 양손하트는 양쪽 검지 끝(윗골)과 엄지 끝(아랫점)이 동시에 가까워진다.
+  // 손 중심 간격으로 거르면 손을 옆으로 기울였을 때 기준 길이가 짧아져, 충분히
+  // 떨어진 정상 양손 볼하트도 탈락할 수 있다. 그래서 중심 거리는 판정에 쓰지 않고
+  // 두 접점의 간격만 본다. bigHeartPair의 0.22보다 넉넉한 0.38을 써서 랜드마크가
+  // 조금 흔들린 양손하트도 막되, 두 손이 실제로 떨어져 있으면 통과시킨다.
+  const CHEEK_JOINED_TIP_GAP = 0.38;
+  let pairInfo = null; // 디버그용: 두 접점이 가장 가까운 쌍의 정보
+  for (let i = 0; i < hands.length; i++) {
+    for (let j = i + 1; j < hands.length; j++) {
+      const scale = (handSpan2D(hands[i]) + handSpan2D(hands[j])) / 2 || 0.001;
+      const indexGap = dist(hands[i][8], hands[j][8]) / scale;
+      const thumbGap = dist(hands[i][4], hands[j][4]) / scale;
+      const joined = indexGap < CHEEK_JOINED_TIP_GAP && thumbGap < CHEEK_JOINED_TIP_GAP;
+      const pairScore = Math.max(indexGap, thumbGap);
+      if (!pairInfo || pairScore < pairInfo.score) {
+        pairInfo = { score: pairScore, indexGap, thumbGap, joined };
+      }
+      if (joined) {
+        lastPairPerHandOk[i] = false;
+        lastPairPerHandOk[j] = false;
+        if (DEBUG_POSE) {
+          window.__poseDebug =
+            `볼하트 · 양손 접점 간격(각각 ${CHEEK_JOINED_TIP_GAP} 이상 필요)` +
+            `: 검지 ${indexGap.toFixed(2)} / 엄지 ${thumbGap.toFixed(2)}` +
+            ' → 붙여 만든 양손하트로 보고 인정 안 함';
+        }
+        return false;
+      }
+    }
+  }
+  if (DEBUG_POSE && pairInfo) {
+    window.__poseDebug = perHandDebug +
+      ` ‖ 최근접 두 손 접점: 검지 ${pairInfo.indexGap.toFixed(2)} / 엄지 ${pairInfo.thumbGap.toFixed(2)}` +
+      ` (둘 다 ${CHEEK_JOINED_TIP_GAP} 미만이면 탈락)`;
+  }
+  return true;
+}
+
 const SPECIAL_CHECKERS = {
   bigheart: makePairChecker(bigHeartPair, '양손하트'),
+  cheekheart: cheekHeartChecker,
 };
 
 const CHECKERS = {};
@@ -1424,6 +1588,7 @@ function toggleSelect(i, div) {
   });
   document.getElementById('selCount').textContent = selectedIds.length;
   document.getElementById('composeBtn').disabled = selectedIds.length !== 4;
+  scheduleLivePreview();
 }
 
 document.getElementById('layoutVertical').onclick = () => setLayout('vertical');
@@ -1436,6 +1601,7 @@ function setLayout(l) {
   // 기존 AI 프레임 생성 패널을 보여줌 (둘은 동시에 필요 없음).
   document.getElementById('frameGenPanel').style.display = l === '2x2' ? 'none' : '';
   document.getElementById('gridColorPanel').style.display = l === '2x2' ? '' : 'none';
+  scheduleLivePreview();
 }
 
 // ---------- AI 프레임 생성 (4cut_demo에서 병합) ----------
@@ -1449,7 +1615,6 @@ const styleRefStatus = document.getElementById('styleRefStatus');
 const genFrameBtn = document.getElementById('genFrameBtn');
 const clearFrameBtn = document.getElementById('clearFrameBtn');
 const frameStatus = document.getElementById('frameStatus');
-const framePreview = document.getElementById('framePreview');
 const composeBtn = document.getElementById('composeBtn');
 const finalCanvas = document.getElementById('finalCanvas');
 
@@ -1488,7 +1653,7 @@ const DEFAULT_NEGATIVE_PROMPT_TEXT =
 // 경향). 그래서 캔버스로 바꿨다가, negative에 "photorealistic, photograph, stock
 // photo, studio photography, glossy 3D render, depth of field, shadow" 등
 // 실제로 나온 결과에 맞춘 구체적인 항목을 넣고 guidance를 8→11로 올렸더니 AI로도
-// 플랫한 스티커 느낌이 나오는 걸 재확인함(BIRTHDAY_CHRISTMAS_NEGATIVE 참고). 다만
+// 플랫한 스티커 느낌이 나오는 걸 재확인함(BIRTHDAY_WINTER_NEGATIVE 참고). 다만
 // 그렇게 사실적 묘사를 강하게 막으니 이번엔 화면을 풍선/눈꽃으로 꽉 채우는 쪽으로
 // 쏠려서, strength를 1→0.8로 낮춰 흰 캔버스(=여백)에 조금 더 앵커링되게 해서
 // 여백도 같이 확보함.
@@ -1498,30 +1663,23 @@ const DEFAULT_NEGATIVE_PROMPT_TEXT =
 // 표현으로 바꿨더니 스트립 전체에 고르게 흩뿌려지는 빈도가 늘어서 같은 패턴을 적용함.
 // 그래도 완전히 결정적이진 않아서(가끔 여전히 몰림) getGeneratedImageIssue()에
 // "몇 개 구역이 통째로 비어있으면 재시도" 체크를 추가해 이중으로 방어함.
-const BIRTHDAY_CHRISTMAS_NEGATIVE =
+const BIRTHDAY_WINTER_NEGATIVE =
   'photorealistic, photograph, photography, stock photo, studio photography, glossy 3D render, realistic lighting, depth of field, shadow, all-over pattern, wallpaper, dense ornament, crowded border, clusters, repeated motifs, filled border, oversized motif, storybook illustration, childlike drawing, watercolor, painterly, text, watermark';
-const BIRTHDAY_CHRISTMAS_STYLE =
+const BIRTHDAY_WINTER_STYLE =
   'cute kawaii sticker illustration, bold flat colors, clean thick outline, ultra-bright pastel background, plenty of empty space';
 
 const THEME_PRESETS = {
   birthday: {
     motifs: 'a small birthday cake, a couple of balloons, scattered confetti, a small gift box',
-    style: BIRTHDAY_CHRISTMAS_STYLE,
-    negative: BIRTHDAY_CHRISTMAS_NEGATIVE,
+    style: BIRTHDAY_WINTER_STYLE,
+    negative: BIRTHDAY_WINTER_NEGATIVE,
     guidance: 11.0,
     strength: 0.8,
   },
-  christmas: {
-    motifs: 'a small christmas tree, a couple of ornaments, scattered snowflakes, a small santa hat',
-    style: BIRTHDAY_CHRISTMAS_STYLE,
-    negative: BIRTHDAY_CHRISTMAS_NEGATIVE,
-    guidance: 11.0,
-    strength: 0.8,
-  },
-  heart: {
-    motifs: 'a few glossy pink heart stickers, a small pink gingham checkered patch, a soft glowing heart, scattered heart confetti',
-    style: BIRTHDAY_CHRISTMAS_STYLE,
-    negative: BIRTHDAY_CHRISTMAS_NEGATIVE,
+  winter: {
+    motifs: 'a couple of snowflakes, a small knit mitten, a warm scarf, a small pinecone',
+    style: BIRTHDAY_WINTER_STYLE,
+    negative: BIRTHDAY_WINTER_NEGATIVE,
     guidance: 11.0,
     strength: 0.8,
   },
@@ -1753,9 +1911,8 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function drawHeart(ctx, cx, cy, size, color) {
+function drawHeart(ctx, cx, cy, size, color, strokeColor) {
   ctx.save();
-  ctx.fillStyle = color;
   ctx.beginPath();
   const t = size * 0.3;
   ctx.moveTo(cx, cy + t);
@@ -1764,6 +1921,14 @@ function drawHeart(ctx, cx, cy, size, color) {
   ctx.bezierCurveTo(cx, cy + (size + t) / 2, cx + size / 2, cy + (size + t) / 2, cx + size / 2, cy + t);
   ctx.bezierCurveTo(cx + size / 2, cy, cx, cy, cx, cy + t);
   ctx.closePath();
+  // 흰색 하트가 흰색/밝은 배경 프레임 위에서도 보이도록 옅은 테두리를 먼저 둘러줌
+  if (strokeColor) {
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = size * 0.14;
+    ctx.strokeStyle = strokeColor;
+    ctx.stroke();
+  }
+  ctx.fillStyle = color;
   ctx.fill();
   ctx.restore();
 }
@@ -1917,25 +2082,6 @@ function buildStripInpaintingAssets(size, outputW, outputH, styleRefImg = null) 
   mctx.fillStyle = '#ffffff';
   mctx.fillRect(0, 0, outputW, outputH);
   return { baseCanvas, maskCanvas };
-}
-
-function buildStripPreviewDataUrl(img, size) {
-  const { W, H, chipH, pad, border, margin, photoW, photoH } = size;
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  drawFrameCover(ctx, img, 0, 0, W, H, 0);
-  ctx.fillStyle = '#f7ecf0';
-  for (let i = 0; i < 4; i++) {
-    ctx.fillRect(
-      pad + border - margin,
-      pad + i * chipH + border - margin,
-      photoW + margin * 2,
-      photoH + margin * 2
-    );
-  }
-  return canvas.toDataURL('image/png');
 }
 
 function canvasToBase64Png(canvas) {
@@ -2126,7 +2272,6 @@ async function generateFrame() {
     return;
   }
   genFrameBtn.disabled = true;
-  framePreview.style.display = 'none';
   frameStatus.textContent = '1×4 세로 프레임 전체를 준비하고 있어요...';
 
   // AI 프레임 생성은 세로 1x4 모드에서만 지원함(패널 자체가 2x2에서는 숨겨짐).
@@ -2232,8 +2377,6 @@ async function generateFrame() {
 
     stripFrameImg = acceptedFrame;
     stripFrameRequestSize = { width: requestW, height: requestH };
-    framePreview.src = buildStripPreviewDataUrl(stripFrameImg, size);
-    framePreview.style.display = 'block';
     frameStatus.textContent = '연결된 1×4 세로 프레임 생성 완료! 네 사진 자리를 하나의 긴 디자인이 감싸요.';
   } catch (err) {
     // "Failed to fetch"는 서버가 아예 응답하지 않을 때(주소가 없거나, 백엔드가
@@ -2269,24 +2412,22 @@ function buildSolidFrameDataUrl(w, h, color) {
 async function generateSimpleFrame() {
   universityFrameActive = false;
   genFrameBtn.disabled = true;
-  framePreview.style.display = 'none';
   const size = getStripVerticalSize();
   const dataUrl = buildSolidFrameDataUrl(size.W, size.H, simpleColor);
   stripFrameImg = await loadImage(dataUrl);
   stripFrameRequestSize = { width: size.W, height: size.H };
-  framePreview.src = dataUrl;
-  framePreview.style.display = 'block';
   themeStatus.textContent = `"${SIMPLE_COLORS[simpleColor]}" 단색 프레임 적용 완료! (AI를 안 거쳐서 항상 무늬 없이 나와요)`;
   frameStatus.textContent = '단색 프레임이 적용됐어요.';
   genFrameBtn.disabled = false;
+  scheduleLivePreview();
 }
 
 function clearFrame() {
   universityFrameActive = false;
   stripFrameImg = null;
   stripFrameRequestSize = null;
-  framePreview.style.display = 'none';
   frameStatus.textContent = '기본 디자인으로 돌아갔어요.';
+  scheduleLivePreview();
 }
 
 // ---------- 우주 프레임 (AI 없이 canvas로 직접 그림) ----------
@@ -2361,7 +2502,6 @@ function drawFirework(ctx, cx, cy, size, color) {
 async function generateSpaceFrame() {
   universityFrameActive = false;
   genFrameBtn.disabled = true;
-  framePreview.style.display = 'none';
   const size = getStripVerticalSize();
   const c = document.createElement('canvas');
   c.width = size.W;
@@ -2388,21 +2528,20 @@ async function generateSpaceFrame() {
   const dataUrl = c.toDataURL('image/png');
   stripFrameImg = await loadImage(dataUrl);
   stripFrameRequestSize = { width: size.W, height: size.H };
-  framePreview.src = dataUrl;
-  framePreview.style.display = 'block';
   themeStatus.textContent = '어두운 밤하늘 + 불꽃놀이 반짝임 프레임 적용 완료! (AI를 안 거쳐서 항상 안정적으로 나와요)';
   frameStatus.textContent = '우주 프레임이 적용됐어요.';
   genFrameBtn.disabled = false;
 }
 
-genFrameBtn.addEventListener('click', () => {
+genFrameBtn.addEventListener('click', async () => {
   if (selectedThemeId === 'simple') {
-    generateSimpleFrame();
+    await generateSimpleFrame();
   } else if (selectedThemeId === 'space') {
-    generateSpaceFrame();
+    await generateSpaceFrame();
   } else {
-    generateFrame();
+    await generateFrame();
   }
+  scheduleLivePreview();
 });
 clearFrameBtn.addEventListener('click', clearFrame);
 
@@ -2420,7 +2559,7 @@ clearFrameBtn.addEventListener('click', clearFrame);
 const UNIVERSITY_PRESETS = [
   { key: 'snu', aliases: ['서울대', '서울대학교', 'snu', 'seoul national university'], color: '#003876', englishName: 'SEOUL NATIONAL UNIVERSITY', initial: 'SNU' },
   { key: 'yonsei', aliases: ['연세대', '연세대학교', 'yonsei', 'yonsei university'], color: '#00205b', englishName: 'YONSEI UNIVERSITY', initial: 'Y' },
-  { key: 'korea', aliases: ['고려대', '고려대학교', 'ku', 'korea university'], color: '#8b1e3f', englishName: 'KOREA UNIVERSITY', initial: 'KU' },
+  { key: 'korea', aliases: ['고려대', '고려대학교', 'ku', 'korea university'], color: '#971e23', englishName: 'KOREA UNIVERSITY', initial: 'KU' },
   { key: 'kaist', aliases: ['카이스트', 'kaist'], color: '#0a3161', englishName: 'KAIST', initial: 'K' },
   { key: 'hanyang', aliases: ['한양대', '한양대학교', 'hanyang', 'hanyang university'], color: '#004a93', englishName: 'HANYANG UNIVERSITY', initial: 'H' },
   { key: 'ewha', aliases: ['이화여대', '이화여자대학교', 'ewha', 'ewha womans university'], color: '#1f5c3f', englishName: 'EWHA WOMANS UNIVERSITY', initial: 'E' },
@@ -2429,9 +2568,11 @@ const UNIVERSITY_PRESETS = [
   { key: 'cau', aliases: ['중앙대', '중앙대학교', 'cau', 'chung-ang university', 'chungang university'], color: '#0f2b5c', englishName: 'CHUNG-ANG UNIVERSITY', initial: 'CAU' },
   { key: 'khu', aliases: ['경희대', '경희대학교', 'khu', 'kyung hee university'], color: '#6f1d3c', englishName: 'KYUNG HEE UNIVERSITY', initial: 'KHU' },
   { key: 'hufs', aliases: ['한국외대', '한국외국어대학교', '외대', 'hufs', 'hankuk university of foreign studies'], color: '#003d7c', englishName: 'HANKUK UNIVERSITY OF FOREIGN STUDIES', initial: 'HUFS' },
-  { key: 'uos', aliases: ['서울시립대', '서울시립대학교', 'uos', 'university of seoul'], color: '#004b93', englishName: 'UNIVERSITY OF SEOUL', initial: 'UOS' },
+  { key: 'uos', aliases: ['서울시립대', '서울시립대학교', '서울시', 'uos', 'university of seoul'], color: '#004b93', englishName: 'UNIVERSITY OF SEOUL', initial: 'UOS' },
   { key: 'konkuk', aliases: ['건국대', '건국대학교', 'konkuk', 'konkuk university'], color: '#006241', englishName: 'KONKUK UNIVERSITY', initial: 'KU' },
-  { key: 'dongguk', aliases: ['동국대', '동국대학교', 'dongguk', 'dongguk university'], color: '#6a1b2e', englishName: 'DONGGUK UNIVERSITY', initial: 'DGU' },
+  // 학교색은 PANTONE 159 C(주황)로 지정 요청받음 — sRGB 근사치라 실제 인쇄용
+  // 스와치와는 미세하게 다를 수 있음.
+  { key: 'dongguk', aliases: ['동국대', '동국대학교', 'dongguk', 'dongguk university'], color: '#C4622D', englishName: 'DONGGUK UNIVERSITY', initial: 'DGU' },
   { key: 'hongik', aliases: ['홍익대', '홍익대학교', 'hongik', 'hongik university'], color: '#c8102e', englishName: 'HONGIK UNIVERSITY', initial: 'HU' },
   { key: 'sookmyung', aliases: ['숙명여대', '숙명여자대학교', 'sookmyung', "sookmyung women's university"], color: '#4b1e6d', englishName: "SOOKMYUNG WOMEN'S UNIVERSITY", initial: 'SM' },
   { key: 'kookmin', aliases: ['국민대', '국민대학교', 'kookmin', 'kookmin university'], color: '#003876', englishName: 'KOOKMIN UNIVERSITY', initial: 'KMU' },
@@ -2561,7 +2702,11 @@ async function buildUniversityStripDataUrl(size, univ) {
 
   const logoImg = await resolveUniversityLogoImage(univ);
   if (logoImg) {
-    ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+    if (univ.key === 'pusan') {
+      drawLogoWithWhiteBacking(ctx, logoImg, logoX, logoY, logoSize);
+    } else {
+      ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+    }
   } else {
     drawUniversityFallbackBadge(ctx, logoX + logoSize / 2, footerCenterY, logoSize / 2, univ);
   }
@@ -2608,6 +2753,19 @@ async function resolveUniversityLogoImage(univ) {
   return null;
 }
 
+// 부산대 로고는 파란 선/글자 디자인이 학교색 배경(진한 파랑)에 묻혀 보이는
+// 문제가 있어서, 부산대에 한해서만 대체 배지와 같은 방식으로 흰 원을 먼저
+// 깔아준 뒤 그 위에 실제 로고를 그림(다른 학교는 원래대로 로고만 그대로 그림).
+function drawLogoWithWhiteBacking(ctx, img, x, y, size) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.restore();
+  ctx.drawImage(img, x, y, size, size);
+}
+
 function drawUniversityFallbackBadge(ctx, cx, cy, r, univ) {
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -2645,22 +2803,21 @@ async function generateUniversityFrame() {
     gridUniversity = univ;
     universityStatus.textContent = `"${univ.englishName}" 색상과 로고가 2x2 배경에 반영됐어요.`;
     genUniversityBtn.disabled = false;
+    scheduleLivePreview();
     return;
   }
 
-  framePreview.style.display = 'none';
   const size = getStripVerticalSize();
   const { dataUrl, usedLogo } = await buildUniversityStripDataUrl(size, univ);
   stripFrameImg = await loadImage(dataUrl);
   stripFrameRequestSize = { width: size.W, height: size.H };
   universityFrameActive = true;
-  framePreview.src = dataUrl;
-  framePreview.style.display = 'block';
   universityStatus.textContent = usedLogo
     ? `"${univ.englishName}" 프레임 적용 완료! 로고가 반영됐어요.`
     : `"${univ.englishName}" 프레임 적용 완료! (로고가 없어서 자체 제작 이니셜 배지로 대신했어요. logos/${univ.key}.png 파일을 넣거나 위에서 업로드하면 반영돼요)`;
   frameStatus.textContent = '대학교 프레임이 적용됐어요.';
   genUniversityBtn.disabled = false;
+  scheduleLivePreview();
 }
 
 genUniversityBtn.addEventListener('click', generateUniversityFrame);
@@ -2672,7 +2829,9 @@ universityInput.addEventListener('keydown', (e) => {
 // 채울 때는 .value만 바꾸고 여기를 안 거치므로 영향 없음).
 document.getElementById('gridColorInput').addEventListener('input', () => {
   gridUniversity = null;
+  scheduleLivePreview();
 });
+titleInput.addEventListener('input', scheduleLivePreview);
 
 // ---------- 4컷 합성 (제스처로 고른 사진 + AI 프레임) ----------
 async function composeFinal() {
@@ -2687,13 +2846,13 @@ async function composeFinal() {
   }
 }
 
-function composeVertical(images) {
+function composeVertical(images, targetCanvas = finalCanvas) {
   const { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H } = getStripVerticalSize();
   const hasFrame = !!stripFrameImg && !!stripFrameRequestSize;
 
-  finalCanvas.width = W * OUTPUT_SCALE;
-  finalCanvas.height = H * OUTPUT_SCALE;
-  const ctx = finalCanvas.getContext('2d');
+  targetCanvas.width = W * OUTPUT_SCALE;
+  targetCanvas.height = H * OUTPUT_SCALE;
+  const ctx = targetCanvas.getContext('2d');
   ctx.setTransform(OUTPUT_SCALE, 0, 0, OUTPUT_SCALE, 0, 0);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -2757,22 +2916,37 @@ function composeVertical(images) {
       ctx.fill();
     }
 
+    // 프레임이 흰색/밝은 배경일 때 흰 글씨·하트가 묻히지 않도록, hasFrame이면
+    // 항상 옅은 테두리를 같이 둘러줌 (어두운 프레임 위에서는 거의 안 보일 만큼
+    // 약하게, 흰 배경 위에서는 그 테두리만으로 윤곽이 드러남)
+    const outlineColor = hasFrame ? 'rgba(60, 42, 53, 0.35)' : null;
+
     ctx.textAlign = 'center';
-    [-30, 0, 30].forEach((dx) => drawHeart(ctx, W / 2 + dx, footerY + 40, 9, hasFrame ? '#ffffff' : '#ff5f96'));
+    [-30, 0, 30].forEach((dx) => drawHeart(ctx, W / 2 + dx, footerY + 40, 9, hasFrame ? '#ffffff' : '#ff5f96', outlineColor));
 
     ctx.save();
     if (hasFrame) {
       ctx.shadowColor = 'rgba(0,0,0,0.55)';
       ctx.shadowBlur = 5;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = outlineColor;
     }
     ctx.fillStyle = hasFrame ? '#ffffff' : '#ff5f96';
     ctx.font = 'bold 28px sans-serif';
     const title = titleInput.value.trim() || 'StoryBooth';
+    if (hasFrame) {
+      ctx.lineWidth = 3;
+      ctx.strokeText(title, W / 2, footerY + 76);
+    }
     ctx.fillText(title, W / 2, footerY + 76);
 
     ctx.fillStyle = hasFrame ? '#ffffff' : '#a97b8c';
     ctx.font = '14px sans-serif';
     const dateStr = new Date().toLocaleDateString('ko-KR');
+    if (hasFrame) {
+      ctx.lineWidth = 2;
+      ctx.strokeText(dateStr, W / 2, footerY + 98);
+    }
     ctx.fillText(dateStr, W / 2, footerY + 98);
     ctx.restore();
   }
@@ -2843,13 +3017,13 @@ function rgbToCss({ r, g, b }) {
 // 따라가고, 안 적으면 기존 기본 핑크로 나감. gridUniversity가 있으면(학교 프레임
 // 버튼으로 색을 채운 경우) 1x4와 같은 로직(resolveUniversityLogoImage)으로 제목
 // 옆에 로고도 그림 — 로고 로드가 비동기라 이 함수도 async로 바꿈.
-async function composeGrid(images) {
+async function composeGrid(images, targetCanvas = finalCanvas) {
   const size = getStripGridSize();
   const { photoW, photoH, border, margin, chipW, chipH, stripW, outerPad, colGap, footerH, W, H } = size;
 
-  finalCanvas.width = W * OUTPUT_SCALE;
-  finalCanvas.height = H * OUTPUT_SCALE;
-  const ctx = finalCanvas.getContext('2d');
+  targetCanvas.width = W * OUTPUT_SCALE;
+  targetCanvas.height = H * OUTPUT_SCALE;
+  const ctx = targetCanvas.getContext('2d');
   ctx.setTransform(OUTPUT_SCALE, 0, 0, OUTPUT_SCALE, 0, 0);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -2913,7 +3087,11 @@ async function composeGrid(images) {
 
     const logoImg = await resolveUniversityLogoImage(gridUniversity);
     if (logoImg) {
-      ctx.drawImage(logoImg, logoX, footerCenterY - logoSize / 2, logoSize, logoSize);
+      if (gridUniversity.key === 'pusan') {
+        drawLogoWithWhiteBacking(ctx, logoImg, logoX, footerCenterY - logoSize / 2, logoSize);
+      } else {
+        ctx.drawImage(logoImg, logoX, footerCenterY - logoSize / 2, logoSize, logoSize);
+      }
     } else {
       drawUniversityFallbackBadge(ctx, logoX + logoSize / 2, footerCenterY, logoSize / 2, gridUniversity);
     }
@@ -2925,6 +3103,38 @@ async function composeGrid(images) {
     ctx.fillStyle = inkCss;
     ctx.fillText(title, W / 2, footerCenterY);
   }
+}
+
+// ---------- 선택 화면 실시간 미리보기 ----------
+// 사진 4장이 다 골라지면, 최종 결과 화면과 같은 합성 로직(composeVertical/
+// composeGrid)을 별도의 작은 캔버스에 그대로 재사용해서 "완성됐을 때 이렇게
+// 보인다"를 선택 화면에서 미리 보여줌. 사진 선택/레이아웃/프레임/제목이 바뀔
+// 때마다 다시 그림.
+const livePreviewWrap = document.getElementById('livePreviewWrap');
+const livePreviewCanvas = document.getElementById('livePreviewCanvas');
+let livePreviewToken = 0;
+
+async function updateLivePreview() {
+  if (selectedIds.length !== 4) {
+    livePreviewWrap.style.display = 'none';
+    return;
+  }
+  const token = ++livePreviewToken;
+  const images = await Promise.all(selectedIds.map(i => loadImage(capturedPhotos[i].dataUrl)));
+  if (token !== livePreviewToken) return; // 그 사이에 선택이 또 바뀌었으면 이 결과는 버림
+  if (selectedLayout === '2x2') {
+    await composeGrid(images, livePreviewCanvas);
+  } else {
+    composeVertical(images, livePreviewCanvas);
+  }
+  if (token !== livePreviewToken) return;
+  livePreviewWrap.style.display = 'block';
+}
+
+let livePreviewDebounce = null;
+function scheduleLivePreview() {
+  clearTimeout(livePreviewDebounce);
+  livePreviewDebounce = setTimeout(updateLivePreview, 150);
 }
 
 composeBtn.addEventListener('click', composeFinal);

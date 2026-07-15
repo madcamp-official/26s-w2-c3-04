@@ -22,7 +22,7 @@
 
 | 이름 | 학교 | GitHub | 역할 |
 |---|---|---|---|
-| 정유진 | 고려대 | yujin923 | 손동작 인식 파트 구현, 프레임 생성 파트 개선, UI, 배포 |
+| 정유진 | 고려대 | yujin923 | 손동작 인식 파트 구현, 프레임 생성 파트 개선, 프런트엔드, 배포 |
 | 양호성 | 카이스트 | hoseong02 | 프레임 생성 파트 구현, 손동작 인식 파트 개선, 백엔드 |
 
 ---
@@ -100,7 +100,7 @@
   ├─ POST /api/theme-keywords   (자유 테마 → 영어 키워드)
   └─ POST /api/generate-frame   (프레임 이미지 생성 요청)
              ↓
-AWS App Runner (server.js, Express)
+AWS EC2 (server.js, Express)
   ├─ 정적 페이지 제공
   ├─ 요청 검증 · 타임아웃 · 오류 처리
   └─ 서버에 보관한 Cloudflare 인증값으로 외부 API 호출
@@ -168,7 +168,7 @@ npm start
 | 분류 | 사용 기술 |
 |---|---|
 | 핵심 기술 | MediaPipe Tasks Vision (HandLandmarker), Canvas API, Vanilla JS |
-| 실행 환경 | 브라우저(프론트) + Node.js 22 / Express (백엔드), AWS App Runner 배포 |
+| 실행 환경 | 브라우저(프론트) + Node.js 22 / Express (백엔드), AWS EC2 배포 |
 | 데이터 저장 | 없음 (무상태 — DB·서버 파일 저장 미사용) |
 | 외부 API / 서비스 | Cloudflare Workers AI (LLM 키워드 변환, 인페인팅 이미지 생성) |
 | 기타 | AWS Secrets Manager (Cloudflare 인증값 보관), dotenv |

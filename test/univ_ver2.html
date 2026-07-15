@@ -296,10 +296,10 @@
     <details>
       <summary>고급: 프롬프트 직접 수정</summary>
       <div class="row" style="margin-top:10px;">
-        <textarea id="promptInput" placeholder="원하는 색과 분위기를 적어주세요. 예: 졸업식 날처럼 꽃다발과 색종이가 흩날리는 화사한 느낌">flat 2D storybook illustration, childlike hand-drawn symbols with solid color fills, ultra-bright high-key pure white-ivory background, clean high-chroma palette, at least ninety percent bare and undecorated, dry wax-pastel texture contained inside each shape, a few small distinct stars and hearts, crisp sharply defined boundaries, plenty of empty space, saturated red, yellow, green, sky blue, pink and orange</textarea>
+        <textarea id="promptInput" placeholder="원하는 색과 분위기를 적어주세요. 예: 졸업식 날처럼 꽃다발과 색종이가 흩날리는 화사한 느낌">clean minimal photo frame design, delicate thin line art, soft pale watercolor accents, ultra-bright high-key pure white-ivory background, gentle low-saturation pastel palette, at least ninety percent bare and undecorated, crisp sharply defined boundaries, plenty of empty space, a few small distinct botanical or seasonal accents, soft blush pink, sky blue and cream</textarea>
       </div>
       <div class="row">
-        <textarea id="negativePromptInput" placeholder="AI가 피했으면 하는 요소를 영어로, 쉼표로 구분해서 적어주세요">animal, character, mascot, repeated motifs, dense ornament, crowded border, clusters, all-over pattern, wallpaper, filled border, oversized motif, colored pencil texture, crayon texture, pencil shading, hatching lines, photorealistic, photograph, 3D render, realistic texture, realistic lighting, muddy colors, desaturated, gray haze, stains, smudges, blur, fuzzy edges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, person, face, crayon stick, art supplies, text, watermark</textarea>
+        <textarea id="negativePromptInput" placeholder="AI가 피했으면 하는 요소를 영어로, 쉼표로 구분해서 적어주세요">animal, character, mascot, repeated motifs, dense ornament, crowded border, clusters, all-over pattern, wallpaper, filled border, oversized motif, storybook illustration, childlike drawing, cartoon, cel shading, thick bold outline, colored pencil texture, crayon texture, pencil shading, hatching lines, photorealistic, photograph, 3D render, realistic texture, realistic lighting, muddy colors, desaturated, gray haze, stains, smudges, blur, fuzzy edges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, person, face, crayon stick, art supplies, text, watermark</textarea>
       </div>
       <div class="option-status">negative prompt: 여기 적힌 건 "이런 건 넣지 마"라는 뜻으로 전달돼요. 긍정 프롬프트에 "no text"처럼 적는 것보다 여기 적는 게 훨씬 잘 먹혀요.</div>
     </details>
@@ -327,6 +327,20 @@
     </div>
     <div class="option-status">AI 프레임 없이 깔끔한 배경색만 적용돼요. 한글로 적어도 되고, 비워두면 기본 핑크로 나가요.</div>
   </div>
+
+  <div class="option-card" id="universityPanel">
+    <h2>🎓 대학교 프레임</h2>
+    <div class="row">
+      <input type="text" id="universityInput" placeholder="학교 이름을 입력하세요. 예: 고려대, 카이스트, 한양대" autocomplete="off" />
+      <button class="btn-secondary" id="genUniversityBtn" type="button">학교 프레임 생성</button>
+    </div>
+    <div class="row" style="align-items:center;">
+      <label id="universityLogoLabel" style="font-size:12px;color:#8a7580;flex:1;">로고 업로드는 학교 이름을 먼저 입력해야 활성화돼요</label>
+      <input type="file" id="universityLogoInput" accept="image/*" disabled style="flex:1;min-width:0;font-size:12px;" />
+    </div>
+    <div class="option-status" id="universityStatus">학교 고유 색상 + 영문 이름을 맨 아래 여백에 넣어 심플한 프레임을 만들어요. (AI 없이 즉시 생성돼요) 실제 학교 로고는 상표물이라 직접 넣지 않고, 정당하게 구하신 로고 파일을 위에서 올리면 자동 반영돼요. 안 올리면 이니셜 배지로 대체돼요. 지원 학교: 서울대, 연세대, 고려대, 카이스트, 한양대, 이화여대, 성균관대, 서강대, 중앙대, 경희대, 한국외대, 서울시립대, 건국대, 동국대, 홍익대, 숙명여대, 국민대, 포스텍, 부산대</div>
+  </div>
+
 
   <div style="text-align:center;">
     <button id="composeBtn" disabled>4컷 완성하기</button>
@@ -872,8 +886,15 @@ const THEME_PRESETS = {
 // "hand-drawn symbols"(손그림)를 빼고 "clean flat vector icon"으로 바꿔서
 // 색연필/크레용으로 칠한 듯한 거친 질감이 덜 나오게 함. "flat 2D"는 그대로 남겨서
 // generateFrame()의 guardedBasePrompt가 이 문구를 중복으로 앞에 또 붙이지 않게 함.
+//
+// (수정) "storybook illustration / childlike" 계열 단어가 동화책 삽화처럼 너무
+// 유치하고 진한 느낌을 만들어서, 포토이즘 벚꽃 프레임처럼 "여백이 넓고 장식은
+// 옅은 수채/라인아트로 아주 조금만 있는" 느낌으로 바꿈. requiredDoodleStyle
+// 가드(generateFrame() 안)도 반드시 이 문구와 동일하게 맞춰야 함 — 서로 다른
+// 키워드를 쓰면 가드가 "이 스타일 문구가 없다"고 판단해서 옛날 문구를 또
+// 앞에 붙여버림.
 const THEME_STYLE_SKELETON =
-  'flat 2D vector illustration, clean simple icon-style symbols, smooth solid color fills, soft pastel colors, cheerful mood';
+  'clean minimal photo frame design, delicate thin line art, soft pale watercolor accents, elegant simple decoration, mostly white and pastel background, professional photobooth aesthetic';
 
 // "심플"은 다른 테마와 달리 무늬(doodle)가 "전혀" 없어야 하는데, AI 인페인팅
 // 모델은 negative prompt를 아무리 강하게 줘도 미세한 선/얼룩 하나 정도는 남기는
@@ -977,6 +998,9 @@ themeCustomInput.addEventListener('keydown', (e) => {
 
 let stripFrameImg = null; // 세로 1x4 또는 2x2 전체를 한 번에 생성한 프레임 이미지
 let stripFrameRequestSize = null;
+// true면 stripFrameImg 안에 로고+영문명이 이미 다 그려져 있다는 뜻이라,
+// composeVertical()의 기본 하트+제목+날짜 오버레이를 건너뛰어야 함
+let universityFrameActive = false;
 let styleRefImg = null; // 업로드한 스타일 참고 이미지(선택)
 
 const DEFAULT_STYLE_REF_STATUS = '선택 사항: 색감·분위기를 따라 하고 싶은 참고 이미지를 올리면 그 톤에 맞춰 테두리를 생성해요.';
@@ -1398,6 +1422,7 @@ function drawStripSeparator(ctx, centerY, height, W, frameH) {
 }
 
 async function generateFrame() {
+  universityFrameActive = false;
   const basePrompt = promptInput.value.trim();
   if (!basePrompt) {
     frameStatus.textContent = '프롬프트를 입력해주세요.';
@@ -1425,11 +1450,11 @@ async function generateFrame() {
   // (1) 문장을 짧게, (2) 구조적으로 중요한 지시를 앞쪽에, (3) 긍정 프롬프트에
   // "no X" 형태의 부정문을 넣지 않음(대신 negativePrompt에만 명시)
   const styleRefSuffix = styleRefImg ? ', matching the reference image colors and composition' : '';
-  const requiredDoodleStyle = 'flat 2D storybook illustration, childlike hand-drawn symbols, solid color fills';
-  const guardedBasePrompt = /storybook illustration|hand-drawn symbols|flat 2D/i.test(basePrompt)
+  const requiredDoodleStyle = 'clean minimal photo frame design, delicate thin line art, soft pale watercolor accents';
+  const guardedBasePrompt = /delicate thin line art|minimal photo frame design|pale watercolor/i.test(basePrompt)
     ? basePrompt
     : `${requiredDoodleStyle}, ${basePrompt}`;
-  const prompt = `${guardedBasePrompt}, only one or two tiny isolated motifs across the entire strip, vast bare background${styleRefSuffix}`;
+  const prompt = `${guardedBasePrompt}, only one or two tiny isolated accents across the entire strip, vast bare background${styleRefSuffix}`;
 
   // negativePrompt는 negativePromptInput에서 직접 편집 가능. 비워두면
   // 안전한 기본값(DEFAULT_NEGATIVE_BASE)으로 되돌아감.
@@ -1457,7 +1482,7 @@ async function generateFrame() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `${prompt}, mostly plain border with isolated doodles`,
+          prompt: `${prompt}, mostly plain border with a few delicate isolated accents`,
           negativePrompt,
           width: requestW, height: requestH,
           image: imageB64, mask: maskBytes,
@@ -1532,6 +1557,7 @@ function buildSolidFrameDataUrl(w, h, color) {
 // 없어서 100% 무늬 없는 결과가 보장됨. (선택한 layout 크기에 맞춰 즉시 생성되므로
 // 네트워크 요청도, 재시도도 필요 없음)
 async function generateSimpleFrame() {
+  universityFrameActive = false;
   genFrameBtn.disabled = true;
   framePreview.style.display = 'none';
   const size = getStripVerticalSize();
@@ -1546,6 +1572,7 @@ async function generateSimpleFrame() {
 }
 
 function clearFrame() {
+  universityFrameActive = false;
   stripFrameImg = null;
   stripFrameRequestSize = null;
   framePreview.style.display = 'none';
@@ -1560,6 +1587,223 @@ genFrameBtn.addEventListener('click', () => {
   }
 });
 clearFrameBtn.addEventListener('click', clearFrame);
+
+// ---------- 대학교 프레임 ----------
+// 실제 학교 로고(교표)는 학교마다 등록된 상표/저작물이라, 제가 임의로 구해서
+// 코드에 박아넣진 않음(학교마다 라이선스 조건이 다 다르고 확인이 안 됨).
+// 대신 "학교 이름/색상/영문명"까지는 자체 데이터로 미리 넣어두고, 실제 로고
+// 이미지는 사용자가 정당하게 구한 파일을 업로드하면 그 학교 키로 저장해서
+// 이후에는 자동으로 재사용함 (localStorage에 저장 — 이 앱은 Claude 아티팩트가
+// 아니라 사용자 컴퓨터에서 직접 돌아가는 일반 웹앱이라 localStorage 사용 가능).
+// 로고를 아직 안 올렸으면 학교색 안에 이니셜만 넣은 자체 제작 배지로 대체함.
+//
+// color는 각 학교 브랜드 가이드에서 흔히 쓰이는 대표색을 최대한 가깝게 넣은
+// 근사치임. 실제 학교 공식 브랜드 컬러 코드를 알고 있다면 아래 값만 바꾸면 됨.
+const UNIVERSITY_PRESETS = [
+  { key: 'snu', aliases: ['서울대', '서울대학교', 'snu', 'seoul national university'], color: '#003876', englishName: 'SEOUL NATIONAL UNIVERSITY', initial: 'SNU' },
+  { key: 'yonsei', aliases: ['연세대', '연세대학교', 'yonsei', 'yonsei university'], color: '#00205b', englishName: 'YONSEI UNIVERSITY', initial: 'Y' },
+  { key: 'korea', aliases: ['고려대', '고려대학교', 'ku', 'korea university'], color: '#8b1e3f', englishName: 'KOREA UNIVERSITY', initial: 'KU' },
+  { key: 'kaist', aliases: ['카이스트', 'kaist'], color: '#0a3161', englishName: 'KAIST', initial: 'K' },
+  { key: 'hanyang', aliases: ['한양대', '한양대학교', 'hanyang', 'hanyang university'], color: '#004a93', englishName: 'HANYANG UNIVERSITY', initial: 'H' },
+  { key: 'ewha', aliases: ['이화여대', '이화여자대학교', 'ewha', 'ewha womans university'], color: '#1f5c3f', englishName: 'EWHA WOMANS UNIVERSITY', initial: 'E' },
+  { key: 'skku', aliases: ['성균관대', '성균관대학교', 'skku', 'sungkyunkwan university'], color: '#002855', englishName: 'SUNGKYUNKWAN UNIVERSITY', initial: 'SKKU' },
+  { key: 'sogang', aliases: ['서강대', '서강대학교', 'sogang', 'sogang university'], color: '#b0212f', englishName: 'SOGANG UNIVERSITY', initial: 'S' },
+  { key: 'cau', aliases: ['중앙대', '중앙대학교', 'cau', 'chung-ang university', 'chungang university'], color: '#0f2b5c', englishName: 'CHUNG-ANG UNIVERSITY', initial: 'CAU' },
+  { key: 'khu', aliases: ['경희대', '경희대학교', 'khu', 'kyung hee university'], color: '#6f1d3c', englishName: 'KYUNG HEE UNIVERSITY', initial: 'KHU' },
+  { key: 'hufs', aliases: ['한국외대', '한국외국어대학교', '외대', 'hufs', 'hankuk university of foreign studies'], color: '#003d7c', englishName: 'HANKUK UNIVERSITY OF FOREIGN STUDIES', initial: 'HUFS' },
+  { key: 'uos', aliases: ['서울시립대', '서울시립대학교', 'uos', 'university of seoul'], color: '#004b93', englishName: 'UNIVERSITY OF SEOUL', initial: 'UOS' },
+  { key: 'konkuk', aliases: ['건국대', '건국대학교', 'konkuk', 'konkuk university'], color: '#006241', englishName: 'KONKUK UNIVERSITY', initial: 'KU' },
+  { key: 'dongguk', aliases: ['동국대', '동국대학교', 'dongguk', 'dongguk university'], color: '#6a1b2e', englishName: 'DONGGUK UNIVERSITY', initial: 'DGU' },
+  { key: 'hongik', aliases: ['홍익대', '홍익대학교', 'hongik', 'hongik university'], color: '#c8102e', englishName: 'HONGIK UNIVERSITY', initial: 'HU' },
+  { key: 'sookmyung', aliases: ['숙명여대', '숙명여자대학교', 'sookmyung', "sookmyung women's university"], color: '#4b1e6d', englishName: "SOOKMYUNG WOMEN'S UNIVERSITY", initial: 'SM' },
+  { key: 'kookmin', aliases: ['국민대', '국민대학교', 'kookmin', 'kookmin university'], color: '#003876', englishName: 'KOOKMIN UNIVERSITY', initial: 'KMU' },
+  { key: 'postech', aliases: ['포항공대', '포스텍', 'postech', 'pohang university of science and technology'], color: '#a6192e', englishName: 'POSTECH', initial: 'P' },
+  { key: 'pusan', aliases: ['부산대', '부산대학교', 'pnu', 'pusan national university'], color: '#003876', englishName: 'PUSAN NATIONAL UNIVERSITY', initial: 'PNU' },
+];
+
+function normalizeUnivQuery(str) {
+  return str.toLowerCase().replace(/\s|대학교|대학|학교/g, '');
+}
+
+function findUniversity(query) {
+  const q = normalizeUnivQuery(query);
+  if (!q) return null;
+  // 정확히 일치하는 것을 우선하고, 없으면 부분 일치(입력이 별칭에 포함되거나
+  // 별칭이 입력에 포함되는 경우)로 한 번 더 찾음
+  for (const u of UNIVERSITY_PRESETS) {
+    if (u.aliases.some((a) => normalizeUnivQuery(a) === q)) return u;
+  }
+  for (const u of UNIVERSITY_PRESETS) {
+    if (u.aliases.some((a) => { const na = normalizeUnivQuery(a); return na.includes(q) || q.includes(na); })) return u;
+  }
+  return null;
+}
+
+// 사용자가 업로드한 로고를 학교 key 기준으로 저장. 브라우저에 영구 저장돼서
+// 한 번 올려두면 다음에 같은 학교를 입력할 때 자동으로 다시 쓰임.
+const UNIV_LOGO_STORAGE_KEY = 'aiFourCutUniversityLogos';
+function loadLogoOverrides() {
+  try {
+    return JSON.parse(localStorage.getItem(UNIV_LOGO_STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+function saveLogoOverride(key, dataUrl) {
+  const all = loadLogoOverrides();
+  all[key] = dataUrl;
+  localStorage.setItem(UNIV_LOGO_STORAGE_KEY, JSON.stringify(all));
+}
+
+const universityInput = document.getElementById('universityInput');
+const genUniversityBtn = document.getElementById('genUniversityBtn');
+const universityStatus = document.getElementById('universityStatus');
+const universityLogoInput = document.getElementById('universityLogoInput');
+const universityLogoLabel = document.getElementById('universityLogoLabel');
+
+// 로고 업로드는 "방금 찾은 학교"를 기준으로 저장함. 입력창에 학교 이름이
+// 바뀔 때마다 지금 몇 번 학교용 업로드인지 라벨로 알려줌.
+let pendingLogoUnivKey = null;
+universityInput.addEventListener('input', () => {
+  const u = findUniversity(universityInput.value.trim());
+  pendingLogoUnivKey = u ? u.key : null;
+  universityLogoLabel.textContent = u
+    ? `"${u.englishName}" 로고 업로드 (선택)`
+    : '로고 업로드는 학교 이름을 먼저 입력해야 활성화돼요';
+  universityLogoInput.disabled = !u;
+});
+
+universityLogoInput.addEventListener('change', () => {
+  const file = universityLogoInput.files && universityLogoInput.files[0];
+  if (!file || !pendingLogoUnivKey) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    saveLogoOverride(pendingLogoUnivKey, reader.result);
+    universityStatus.textContent = '로고가 저장됐어요. "학교 프레임 생성"을 눌러 반영해주세요. (이 브라우저에 계속 저장되어 다음에도 자동으로 쓰여요)';
+  };
+  reader.readAsDataURL(file);
+});
+
+// 세로(1x4) 모드: stripFrameImg 전체를 학교색 배경 + 흰 사진칸으로 그리고,
+// 맨 아래 컬러 여백(footer)에 로고(업로드된 게 있으면 그것, 없으면 자체 제작
+// 이니셜 배지) + 영문 학교명을 나란히 배치함. 각 사진칸 모서리에 반복해서
+// 넣던 배지는 참고 이미지(Pickaboo)처럼 맨 아래 한 곳에만 넣도록 정리함.
+async function buildUniversityStripDataUrl(size, univ) {
+  const { W, H, pad, border, margin, chipW, chipH, photoW, photoH, footerH } = size;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = univ.color;
+  ctx.fillRect(0, 0, W, H);
+
+  for (let i = 0; i < 4; i++) {
+    const chipX = pad;
+    const chipY = pad + i * chipH;
+    const slotX = chipX + border - margin;
+    const slotY = chipY + border - margin;
+    const slotW = photoW + margin * 2;
+    const slotH = photoH + margin * 2;
+    ctx.fillStyle = '#ffffff';
+    roundRectPath(ctx, slotX, slotY, slotW, slotH, 4);
+    ctx.fill();
+  }
+
+  // ---- 맨 아래 컬러 여백: 로고 + 영문 학교명 ----
+  const footerY = H - footerH;
+  const footerCenterY = footerY + footerH / 2;
+  const logoOverrides = loadLogoOverrides();
+  const logoDataUrl = logoOverrides[univ.key];
+  const logoSize = Math.min(footerH * 0.55, 46);
+
+  ctx.font = `bold ${Math.max(13, Math.round(logoSize * 0.42))}px sans-serif`;
+  const title = univ.englishName;
+  const textWidth = ctx.measureText(title).width;
+  const gap = 10;
+  const totalW = logoSize + gap + textWidth;
+  const startX = W / 2 - totalW / 2;
+  const logoX = startX;
+  const logoY = footerCenterY - logoSize / 2;
+
+  if (logoDataUrl) {
+    try {
+      const logoImg = await loadImage(logoDataUrl);
+      ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+    } catch {
+      drawUniversityFallbackBadge(ctx, logoX + logoSize / 2, footerCenterY, logoSize / 2, univ);
+    }
+  } else {
+    drawUniversityFallbackBadge(ctx, logoX + logoSize / 2, footerCenterY, logoSize / 2, univ);
+  }
+
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(title, logoX + logoSize + gap, footerCenterY + 1);
+
+  return c.toDataURL('image/png');
+}
+
+// 로고를 아직 안 올렸을 때 쓰는 자체 제작 대체 배지(실제 교표 아님 — 학교색
+// 원 안에 이니셜만 넣은 디자인이라 상표 문제 없이 바로 쓸 수 있음)
+function drawUniversityFallbackBadge(ctx, cx, cy, r, univ) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.fillStyle = univ.color;
+  ctx.font = `bold ${Math.max(9, r * 0.75)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(univ.initial, cx, cy + 0.5);
+}
+
+async function generateUniversityFrame() {
+  const query = universityInput.value.trim();
+  if (!query) {
+    universityStatus.textContent = '학교 이름을 입력해주세요. 예: 고려대, 카이스트, 한양대';
+    return;
+  }
+  const univ = findUniversity(query);
+  if (!univ) {
+    universityStatus.textContent = `"${query}"에 해당하는 학교를 찾지 못했어요. 지원 목록에 있는 이름(또는 영문 약칭)으로 다시 입력해주세요.`;
+    return;
+  }
+
+  genUniversityBtn.disabled = true;
+  titleInput.value = univ.englishName;
+  const hasLogo = !!loadLogoOverrides()[univ.key];
+
+  if (selectedLayout === '2x2') {
+    // 2x2는 stripFrameImg를 쓰지 않고 별도의 배경색 입력(gridColorInput)을
+    // 그대로 재사용하는 구조라, 학교색 hex만 채워 넣으면 기존 렌더링에 그대로
+    // 반영됨. (로고+영문명 하단 배치는 2x2 구조상 지금은 지원하지 않음)
+    document.getElementById('gridColorInput').value = univ.color;
+    universityStatus.textContent = `"${univ.englishName}" 색상이 2x2 배경색에 반영됐어요. (2x2는 로고 없이 색상만 적용돼요)`;
+    genUniversityBtn.disabled = false;
+    return;
+  }
+
+  framePreview.style.display = 'none';
+  const size = getStripVerticalSize();
+  const dataUrl = await buildUniversityStripDataUrl(size, univ);
+  stripFrameImg = await loadImage(dataUrl);
+  stripFrameRequestSize = { width: size.W, height: size.H };
+  universityFrameActive = true;
+  framePreview.src = dataUrl;
+  framePreview.style.display = 'block';
+  universityStatus.textContent = hasLogo
+    ? `"${univ.englishName}" 프레임 적용 완료! 업로드해두신 로고가 반영됐어요.`
+    : `"${univ.englishName}" 프레임 적용 완료! (아직 로고를 안 올리셔서 자체 제작 이니셜 배지로 대신했어요. 위에서 실제 로고 파일을 올리면 반영돼요)`;
+  frameStatus.textContent = '대학교 프레임이 적용됐어요.';
+  genUniversityBtn.disabled = false;
+}
+
+genUniversityBtn.addEventListener('click', generateUniversityFrame);
+universityInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); generateUniversityFrame(); }
+});
 
 // ---------- 4컷 합성 (제스처로 고른 사진 + AI 프레임) ----------
 async function composeFinal() {
@@ -1633,32 +1877,36 @@ function composeVertical(images) {
     }
   }
 
-  // 하단 라벨: 하트 + 제목 + 날짜
+  // 하단 라벨: 하트 + 제목 + 날짜. 대학교 프레임은 이 오버레이 대신 프레임
+  // 이미지 자체에 로고+영문명을 이미 그려뒀으므로 여기서는 건너뜀 (안 그러면
+  // 로고+영문명 위에 하트+제목이 또 겹쳐 그려짐)
   const footerY = H - footerH;
-  if (!hasFrame) {
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    roundRectPath(ctx, pad * 0.5, footerY + 10, W - pad, footerH - 26, 16);
-    ctx.fill();
+  if (!universityFrameActive) {
+    if (!hasFrame) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      roundRectPath(ctx, pad * 0.5, footerY + 10, W - pad, footerH - 26, 16);
+      ctx.fill();
+    }
+
+    ctx.textAlign = 'center';
+    [-30, 0, 30].forEach((dx) => drawHeart(ctx, W / 2 + dx, footerY + 40, 9, hasFrame ? '#ffffff' : '#ff5f96'));
+
+    ctx.save();
+    if (hasFrame) {
+      ctx.shadowColor = 'rgba(0,0,0,0.55)';
+      ctx.shadowBlur = 5;
+    }
+    ctx.fillStyle = hasFrame ? '#ffffff' : '#ff5f96';
+    ctx.font = 'bold 28px sans-serif';
+    const title = titleInput.value.trim() || 'StoryBooth';
+    ctx.fillText(title, W / 2, footerY + 76);
+
+    ctx.fillStyle = hasFrame ? '#ffffff' : '#a97b8c';
+    ctx.font = '14px sans-serif';
+    const dateStr = new Date().toLocaleDateString('ko-KR');
+    ctx.fillText(dateStr, W / 2, footerY + 98);
+    ctx.restore();
   }
-
-  ctx.textAlign = 'center';
-  [-30, 0, 30].forEach((dx) => drawHeart(ctx, W / 2 + dx, footerY + 40, 9, hasFrame ? '#ffffff' : '#ff5f96'));
-
-  ctx.save();
-  if (hasFrame) {
-    ctx.shadowColor = 'rgba(0,0,0,0.55)';
-    ctx.shadowBlur = 5;
-  }
-  ctx.fillStyle = hasFrame ? '#ffffff' : '#ff5f96';
-  ctx.font = 'bold 28px sans-serif';
-  const title = titleInput.value.trim() || 'StoryBooth';
-  ctx.fillText(title, W / 2, footerY + 76);
-
-  ctx.fillStyle = hasFrame ? '#ffffff' : '#a97b8c';
-  ctx.font = '14px sans-serif';
-  const dateStr = new Date().toLocaleDateString('ko-KR');
-  ctx.fillText(dateStr, W / 2, footerY + 98);
-  ctx.restore();
 }
 
 // 2x2 배경 색상 입력을 실제 rgb로 바꿈. 캔버스는 한글 색 이름을 이해하지

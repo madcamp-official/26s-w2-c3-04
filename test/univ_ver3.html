@@ -1,0 +1,2944 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StoryBooth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* Figma "Design StoryBooth UI" 팀에서 만든 디자인(figma_ui)의 색/타이포/카드
+     스타일을 이 페이지에 입힘. 촬영 화면(.stage-wrap/.status-bar/.grid8)만은
+     Figma 쪽이 세로로 너무 길고 좁아서(max-w-sm, 3:4 카드) 기존 640px 너비를
+     그대로 유지함 — 그 외 색상/모양/타이포는 Figma 팀 값을 그대로 따름.
+     (참고: figma_ui/src/styles/theme.css, StartScreen/ShootingScreen 등) */
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(160deg, #FFFAF7 0%, #FFF0F4 50%, #FFF8F5 100%);
+    color: #3C2A35;
+    margin: 0;
+    padding: 32px 20px 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+  h1 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #3C2A35;
+    margin: 0 0 20px;
+  }
+  /* 촬영 화면: 너비(640px)는 그대로 유지하고, 카드 느낌(둥근 모서리+테두리+그림자)만 입힘 */
+  .stage-wrap {
+    position: relative;
+    width: 640px;
+    max-width: 100%;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 4px solid #D8708C;
+    box-shadow: 0 20px 60px rgba(60, 42, 53, 0.18);
+    background: linear-gradient(160deg, #2A1E26 0%, #1A1320 100%);
+  }
+  video, canvas.overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: auto;
+    transform: scaleX(-1); /* 거울모드 */
+  }
+  video { position: relative; display: block; background: #000; }
+  .status-bar {
+    width: 640px; max-width: 100%;
+    margin-top: 18px;
+    text-align: center;
+    background: #FFFFFF;
+    border: 1px solid rgba(232, 134, 159, 0.15);
+    border-radius: 20px;
+    padding: 18px 20px;
+    box-shadow: 0 4px 16px rgba(60, 42, 53, 0.08);
+  }
+  .gesture-name {
+    font-family: 'Poppins', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    margin: 4px 0;
+    color: #3C2A35;
+  }
+  .guide-caption {
+    font-size: 14px;
+    color: #9B7A8A;
+    margin: 0 0 4px;
+  }
+  .sub-status {
+    font-size: 14px;
+    color: #9B7A8A;
+    min-height: 20px;
+  }
+  .progress {
+    font-size: 13px;
+    color: #C4A8B4;
+    margin-top: 6px;
+  }
+  .countdown-num {
+    font-family: 'Poppins', sans-serif;
+    font-size: 64px;
+    font-weight: 800;
+    color: #E8869F;
+  }
+  .hint-hold {
+    color: #5AB380;
+  }
+  .hint-wait {
+    color: #9B7A8A;
+  }
+  .grid8 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    width: 640px;
+    max-width: 100%;
+  }
+  .thumb {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 3px solid transparent;
+    box-shadow: 0 4px 12px rgba(60, 42, 53, 0.08);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .thumb img { width: 100%; display: block; }
+  .thumb.selected {
+    border-color: #E8869F;
+    box-shadow: 0 8px 24px rgba(232, 134, 159, 0.35);
+  }
+  .thumb .badge {
+    position: absolute; top: 4px; left: 4px;
+    background: rgba(60, 42, 53, 0.65);
+    color: #fff; font-size: 10px;
+    padding: 2px 6px; border-radius: 10px;
+  }
+  .thumb .order {
+    position: absolute; top: 4px; right: 4px;
+    background: #E8869F; color: #fff;
+    font-size: 12px; font-weight: 700;
+    width: 20px; height: 20px; border-radius: 50%;
+    display: none; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(232, 134, 159, 0.6);
+  }
+  .thumb.selected .order { display: flex; }
+  button {
+    background: linear-gradient(135deg, #E8869F, #D8708C);
+    color: #FFFFFF;
+    border: none;
+    padding: 12px 26px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    margin-top: 16px;
+    box-shadow: 0 6px 20px rgba(232, 134, 159, 0.35);
+    transition: transform 0.15s ease;
+  }
+  button:hover:not(:disabled) { transform: translateY(-1px); }
+  button:active { transform: scale(0.97); }
+  button:disabled { background: #F0E4E8; color: #C4A8B4; cursor: not-allowed; box-shadow: none; }
+  .layout-toggle { display: flex; gap: 8px; margin-top: 10px; justify-content: center; }
+  .layout-toggle button {
+    background: #F5EEF0; color: #9B7A8A; padding: 8px 18px; font-size: 12px;
+    font-weight: 500; margin: 0; box-shadow: none;
+  }
+  .layout-toggle button.active { background: #E8869F; color: #fff; box-shadow: 0 4px 14px rgba(232, 134, 159, 0.35); }
+  #finalCanvasWrap {
+    margin-top: 20px;
+    text-align: center;
+    display: inline-block;
+    padding: 16px;
+    background: #FFFFFF;
+    border-radius: 20px;
+    border: 1px solid rgba(232, 134, 159, 0.15);
+    box-shadow: 0 20px 40px rgba(60, 42, 53, 0.12);
+  }
+  #finalCanvas { max-width: 320px; border-radius: 10px; display: block; }
+  .error-box {
+    background: #FDE8EF; color: #C2426A;
+    padding: 12px 16px; border-radius: 14px;
+    border: 1px solid rgba(232, 134, 159, 0.3);
+    font-size: 13px; margin-top: 16px; max-width: 600px;
+  }
+  button.btn-secondary {
+    background: #F5EEF0;
+    color: #5A4050;
+    box-shadow: none;
+  }
+
+  /* --- AI 프레임 생성 카드 (4cut_demo에서 병합) --- */
+  .option-card {
+    margin-top: 20px;
+    width: 640px;
+    max-width: 100%;
+    background: #FFFFFF;
+    color: #3C2A35;
+    border: 1.5px solid rgba(232, 134, 159, 0.2);
+    border-radius: 20px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(60, 42, 53, 0.06);
+  }
+  .option-card h2 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0;
+    color: #3C2A35;
+  }
+  .option-card .row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .option-card input[type="text"],
+  .option-card input[type="file"],
+  .option-card textarea {
+    flex: 1;
+    min-width: 0;
+    padding: 11px 14px;
+    border-radius: 12px;
+    border: 1.5px solid rgba(232, 134, 159, 0.25);
+    font-size: 13px;
+    font-family: inherit;
+    background: #FFF5F8;
+    color: #3C2A35;
+  }
+  .option-card textarea {
+    min-height: 60px;
+    resize: vertical;
+  }
+  .option-card button {
+    margin-top: 0;
+  }
+  .option-status {
+    font-size: 12px;
+    color: #9B7A8A;
+    min-height: 16px;
+    line-height: 1.5;
+  }
+  .theme-chip-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .theme-chip {
+    background: #FFFFFF;
+    color: #5A4050;
+    border: 2px solid #F0E4E8;
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(60, 42, 53, 0.05);
+    transition: all 0.2s ease;
+  }
+  .theme-chip.active {
+    background: #FDE8EF;
+    color: #E8869F;
+    border-color: #E8869F;
+    font-weight: 600;
+    box-shadow: 0 4px 14px rgba(232, 134, 159, 0.3);
+  }
+  /* 색상 스와치는 배경색 자체가 의미라서(inline style), .active의 배경색으로
+     덮어쓰지 않고 대신 테두리 링으로 선택 상태를 표시함 */
+  .simple-color-chip.active {
+    box-shadow: 0 0 0 3px #FDE8EF, 0 0 0 5px #E8869F;
+  }
+  .option-card details {
+    border-top: 1px dashed rgba(232, 134, 159, 0.3);
+    padding-top: 10px;
+  }
+  .option-card summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: #9B7A8A;
+    font-weight: 500;
+  }
+  .option-card summary:hover {
+    color: #3C2A35;
+  }
+  .option-preview {
+    width: 100%;
+    max-width: 200px;
+    display: none;
+    border: 0;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(60, 42, 53, 0.1);
+  }
+  .style-ref-thumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1.5px solid rgba(232, 134, 159, 0.25);
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<h1>StoryBooth</h1>
+
+<div id="app">
+  <div class="stage-wrap" id="captureStage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay" class="overlay"></canvas>
+  </div>
+
+  <div class="status-bar" id="statusBar">
+    <div class="progress" id="progressText">준비 중...</div>
+    <div class="gesture-name" id="gestureName">-</div>
+    <div class="guide-caption" id="guideCaption"></div>
+    <div class="sub-status" id="subStatus">카메라를 불러오는 중입니다</div>
+    <div class="countdown-num" id="countdownNum"></div>
+  </div>
+
+  <div id="errorBox"></div>
+</div>
+
+<div id="selectView" style="display:none;">
+  <p style="text-align:center; color:#9B7A8A;">마음에 드는 사진 4장을 선택하세요 (<span id="selCount">0</span>/4)</p>
+  <div class="grid8" id="grid8"></div>
+  <div style="text-align:center;">
+    <div class="layout-toggle">
+      <button id="layoutVertical" class="active">세로 1x4</button>
+      <button id="layout2x2">2x2</button>
+    </div>
+  </div>
+
+  <div class="option-card" id="frameGenPanel">
+    <h2>✨ AI 프레임 생성 (Cloudflare Workers AI)</h2>
+
+    <div class="theme-chip-row" id="themeChipRow">
+      <button type="button" class="theme-chip" data-theme="space">🚀 우주</button>
+      <button type="button" class="theme-chip" data-theme="birthday">🎂 생일</button>
+      <button type="button" class="theme-chip" data-theme="heart">💗 하트</button>
+      <button type="button" class="theme-chip" data-theme="simple">⬜ 심플</button>
+      <button type="button" class="theme-chip" data-theme="christmas">🎄 크리스마스</button>
+      <button type="button" class="theme-chip" data-theme="travel">🌊 바다</button>
+    </div>
+    <div class="theme-chip-row" id="simpleColorRow" style="display:none;">
+      <button type="button" class="theme-chip simple-color-chip" data-color="#ffffff" style="background:#ffffff;color:#333;">흰색</button>
+      <button type="button" class="theme-chip simple-color-chip" data-color="#000000" style="background:#000000;color:#fff;">검정</button>
+      <button type="button" class="theme-chip simple-color-chip" data-color="#fffff0" style="background:#fffff0;color:#333;">아이보리</button>
+      <button type="button" class="theme-chip simple-color-chip" data-color="#8a8360" style="background:#8a8360;color:#fff;">카키</button>
+      <button type="button" class="theme-chip simple-color-chip" data-color="#971e23" style="background:#971e23;color:#fff;">크림슨레드</button>
+      <button type="button" class="theme-chip simple-color-chip" data-color="#00003d" style="background:#00003d;color:#fff;">남색</button>
+    </div>
+    <div class="row">
+      <input type="text" id="themeCustomInput" placeholder="원하는 테마를 직접 적어도 돼요. 예: 놀이공원에서 찍는 거" />
+      <button class="btn-secondary" id="applyThemeBtn" type="button">적용</button>
+    </div>
+    <div class="option-status" id="themeStatus">테마를 고르거나 직접 입력하면 프롬프트에 자동으로 반영돼요. 영어로 적으면 더 정확하게 반영되지만, 한글도 괜찮아요.</div>
+
+    <details>
+      <summary>고급: 프롬프트 직접 수정</summary>
+      <div class="option-status" style="margin-top:10px;">positive prompt: 여기 적힌 게 실제로 프레임에 그려지는 내용이에요. 위 테마 칩을 고르면 이 칸이 자동으로 채워지고, 직접 수정해서 더 다듬을 수도 있어요.</div>
+      <div class="row">
+        <textarea id="promptInput" placeholder="원하는 색과 분위기를 적어주세요. 예: 졸업식 날처럼 꽃다발과 색종이가 흩날리는 화사한 느낌">flat minimal graphic design, solid flat pastel background, simple flat vector icon, no gradients, blurred pastel bokeh dots in corners, high contrast simple shapes, plenty of negative space</textarea>
+      </div>
+      <div class="option-status">negative prompt: 여기 적힌 건 "이런 건 넣지 마"라는 뜻으로 전달돼요. 긍정 프롬프트에 "no text"처럼 적는 것보다 여기 적는 게 훨씬 잘 먹혀요.</div>
+      <div class="row">
+        <textarea id="negativePromptInput" placeholder="AI가 피했으면 하는 요소를 영어로, 쉼표로 구분해서 적어주세요">animal, character, mascot, repeated motifs, dense ornament, crowded border, clusters, all-over pattern, wallpaper, filled border, oversized motif, storybook illustration, childlike drawing, cartoon, cel shading, thick bold outline, colored pencil texture, crayon texture, pencil shading, hatching lines, watercolor, painterly, ink illustration, brush strokes, sketch, photorealistic, photograph, 3D render, realistic texture, realistic lighting, muddy colors, desaturated, gray haze, stains, smudges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, person, face, crayon stick, art supplies, text, watermark</textarea>
+      </div>
+    </details>
+
+    <div class="row" style="align-items:center;">
+      <input type="file" id="styleRefInput" accept="image/*" style="flex:1;min-width:0;font-size:12px;" />
+      <img id="styleRefThumb" class="style-ref-thumb" alt="스타일 참고 이미지 미리보기" />
+      <button class="btn-secondary" id="clearStyleRefBtn" type="button" style="display:none;">참고 이미지 제거</button>
+    </div>
+    <div class="option-status" id="styleRefStatus">선택 사항: 색감·분위기를 따라 하고 싶은 참고 이미지를 올리면 그 톤에 맞춰 테두리를 생성해요.</div>
+    <div class="row">
+      <input type="text" id="titleInput" placeholder="제목 텍스트" value="StoryBooth" autocomplete="off" />
+    </div>
+    <div class="row">
+      <button id="genFrameBtn" style="flex:1">프레임 생성</button>
+      <button class="btn-secondary" id="clearFrameBtn">기본으로</button>
+    </div>
+    <div class="option-status" id="frameStatus">사진 자리 4개가 뚫린 긴 1×4 프레임을 하나로 이어서 생성해요.</div>
+    <img class="option-preview" id="framePreview" alt="생성된 프레임 미리보기" />
+  </div>
+  <div class="option-card" id="gridColorPanel" style="display:none;">
+    <h2>🎨 2x2 배경 색상</h2>
+    <div class="row">
+      <input type="text" id="gridColorInput" placeholder="예: 핑크, 하늘색, 노랑, blue, #3498db" />
+    </div>
+    <div class="option-status">AI 프레임 없이 깔끔한 배경색만 적용돼요. 한글로 적어도 되고, 비워두면 기본 핑크로 나가요.</div>
+  </div>
+
+  <div class="option-card" id="universityPanel">
+    <h2>🎓 대학교 프레임</h2>
+    <div class="row">
+      <input type="text" id="universityInput" placeholder="학교 이름을 입력하세요. 예: 고려대, 카이스트, 한양대" autocomplete="off" />
+      <button class="btn-secondary" id="genUniversityBtn" type="button">학교 프레임 생성</button>
+    </div>
+    <div class="row" style="align-items:center;">
+      <label id="universityLogoLabel" style="font-size:12px;color:#8a7580;flex:1;">로고 업로드는 학교 이름을 먼저 입력해야 활성화돼요</label>
+      <input type="file" id="universityLogoInput" accept="image/*" disabled style="flex:1;min-width:0;font-size:12px;" />
+    </div>
+  </div>
+
+
+  <div style="text-align:center;">
+    <button id="composeBtn" disabled>4컷 완성하기</button>
+  </div>
+</div>
+
+<div id="resultView" style="display:none; text-align:center;">
+  <div id="finalCanvasWrap">
+    <canvas id="finalCanvas"></canvas>
+  </div>
+  <div>
+    <button id="downloadBtn">다운로드</button>
+    <button id="restartBtn" class="btn-secondary">처음부터 다시</button>
+  </div>
+</div>
+
+<script type="module">
+import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+// ---------- 설정 ----------
+const GESTURES = [
+  { id: 'v', name: '브이 ✌️', minHands: 1 },
+  { id: 'thumbsup', name: '엄지척 👍', minHands: 1 },
+  { id: 'tigerclaw', name: '어흥 🐯', minHands: 1 },
+  { id: 'catears', name: '고양이 귀 🐱', minHands: 1 },
+  { id: 'cheekheart', name: '볼하트 💕', minHands: 1 },
+  { id: 'bigheart', name: '양손하트 🫶', minHands: 2 },
+  { id: 'flower', name: '꽃받침 🌸', minHands: 1 },
+  { id: 'mouthpose', name: '숭이포즈 ☝️', minHands: 1 },
+  { id: 'yahoo', name: '야호포즈 🙌', minHands: 1 },
+  { id: 'palmpose', name: '놀라는 포즈 🖐️', minHands: 1 },
+  { id: 'rocknroll', name: '락앤롤 포즈 🤟', minHands: 1 },
+];
+
+// 매 실행마다 6개 중 4개를 랜덤으로 뽑아서 진행 (재미 요소 + 매번 다른 조합)
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+const chosenGestures = shuffle(GESTURES).slice(0, 4);
+
+// 각 제스처를 2번씩 = 총 8장
+const sequence = [];
+chosenGestures.forEach(g => {
+  sequence.push({ ...g, round: 1 });
+  sequence.push({ ...g, round: 2 });
+});
+
+const COUNTDOWN_MS = 3000;
+const RESET_GAP_MS = 1200;         // 촬영 후 다음 동작 준비 텀
+const DETECTION_WINDOW_SIZE = 10;  // 최근 10프레임의 판정 결과를 사용
+const DETECTION_REQUIRED_HITS = 8; // 10프레임 중 8프레임 이상 성공하면 인정
+// 야호(손끝 추정 불안정)와 양손 결합 포즈(여러 손 중 하나가 자주 깜빡여
+// 프레임 단위 실패가 잦음)는 6프레임 성공으로 완화해서 인정한다.
+const RELAXED_DETECTION_REQUIRED_HITS = 6;
+const FAILURE_GRACE_MS = 400;      // 순간적인 인식 실패는 400ms까지 허용
+
+// 개발자용 디버그 플래그. true로 켜면 각 판정 함수의 내부 값(간격비·각도·점수)이
+// 0.5초마다 화면 로그에 출력돼 문턱값 튜닝에 쓸 수 있다. 배포 시엔 false로 둔다.
+const DEBUG_POSE = false;
+
+// ---------- 상태 ----------
+let handLandmarker = null;
+let video = document.getElementById('video');
+let overlay = document.getElementById('overlay');
+let octx = overlay.getContext('2d');
+
+let currentIdx = 0;
+let countdownStartTs = null;
+let detectionHistory = [];
+let detectionFailureStartTs = null;
+let inResetGap = false;
+let capturedPhotos = []; // { dataUrl, gestureName }
+let lastVideoTime = -1;
+
+const gestureNameEl = document.getElementById('gestureName');
+const guideCaptionEl = document.getElementById('guideCaption');
+const subStatusEl = document.getElementById('subStatus');
+const progressTextEl = document.getElementById('progressText');
+const countdownNumEl = document.getElementById('countdownNum');
+const errorBox = document.getElementById('errorBox');
+
+// 동작별 설명 문구 (일러스트 없이 텍스트로만 안내)
+const GUIDE_CAPTION = {
+  v: '검지·중지를 펴서 브이 모양',
+  thumbsup: '엄지만 세우고 나머지 손가락은 접기',
+  tigerclaw: '손바닥이 보이게 들고, 손톱이 보일 정도로만 손가락을 살짝 구부리기',
+  catears: '손목을 머리 위로 들고 손등이 보이게, 검지·중지를 벌려 손톱이 머리에 닿도록 굽히기 (한 손 OK)',
+  cheekheart: '엄지는 아래로, 나머지 네 손가락은 살짝 구부려 반원 모양으로 볼(입 높이 또는 그 위)에 대기 (한 손 OK)',
+  bigheart: '양손을 둥글게 구부려 검지 끝은 위에서, 엄지 끝은 아래에서 맞닿게 하트 만들기',
+  flower: '손가락을 붙여 편 손으로 턱 밑을 컵처럼 받치기 (한 손 OK, 양손도 가능)',
+  mouthpose: '검지손가락을 입꼬리 끝에 대기 (살짝 깨무는 느낌도 OK)',
+  yahoo: '손을 얼굴과 비슷한 거리에 두고, 브이를 뒤집어 손톱이 바닥을 향하게',
+  palmpose: '손등이 보이게, 손가락을 사이사이 틈이 보이도록 쫙 펼치기 (한 손 OK)',
+  rocknroll: '엄지·검지·새끼손가락은 펴고, 중지·약지는 완전히 접기',
+};
+
+function log(msg) {
+  console.log(msg);
+}
+
+
+// ---------- 카메라 + 모델 초기화 ----------
+async function init() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+    video.srcObject = stream;
+    await new Promise(res => video.onloadedmetadata = res);
+    video.play();
+    overlay.width = video.videoWidth;
+    overlay.height = video.videoHeight;
+  } catch (err) {
+    errorBox.innerHTML = `<div class="error-box">카메라를 사용할 수 없습니다: ${err.message}<br>
+    (claude.ai 미리보기 iframe에서는 카메라 권한이 막혀있을 수 있습니다. 이 HTML 파일을 다운로드한 뒤 로컬 브라우저에서 직접 열어서 테스트해주세요.)</div>`;
+    return;
+  }
+
+  subStatusEl.textContent = 'AI 모델을 불러오는 중입니다...';
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+  );
+  handLandmarker = await HandLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+      delegate: "GPU"
+    },
+    runningMode: "VIDEO",
+    // 4명 x 양손 = 8이 필요한데 딱 8로 두면 아홉 번째 손(구경꾼, 프레임에
+    // 걸친 손)이 들어올 때 기존 손이 밀려 짝/개수 판정이 깨진다. 여유분 포함 12.
+    numHands: 12
+  });
+
+  log('모델 로드 완료, 인식 시작');
+  showCurrentGesture();
+  requestAnimationFrame(loop);
+}
+
+// ---------- 제스처 판정 함수 ----------
+// 핵심: 각 함수는 "손 하나"를 판정하는 컴포넌트 체크이고,
+// makeChecker()가 화면에 감지된 모든 손(=모든 사람)이 전부 만족해야 true를 반환하도록 감싸준다.
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+function isFingerExtended(lm, tipIdx, pipIdx) {
+  return (lm[pipIdx].y - lm[tipIdx].y) > 0.02;
+}
+function isFingerCurled(lm, tipIdx, pipIdx) {
+  return !isFingerExtended(lm, tipIdx, pipIdx);
+}
+function wristDist(lm, idx) {
+  return dist(lm[idx], lm[0]);
+}
+// 손목 대비 손끝 거리 "비율"로 굽힘 정도를 판정 (절대 좌표 차이가 아니라 비율이라
+// 카메라와의 거리(확대/축소)나 손이 살짝 돌아간 각도에도 흔들리지 않고 비교적 안정적임)
+function isFingerFolded(lm, tipIdx, mcpIdx) {
+  return wristDist(lm, tipIdx) < wristDist(lm, mcpIdx) * 1.35;
+}
+// 관절(중간 마디, pipIdx)을 꼭짓점으로 mcp-pip-tip 세 점이 이루는 각도.
+// 손가락이 곧게 펴져 있으면 180도에 가깝고, 굽을수록 작아진다. y좌표 비교와 달리
+// 팔/손이 화면에서 어떤 각도로 기울어(대각선으로 들어올린 경우 등) 있어도 값이 흔들리지 않는다.
+function fingerBendAngle(lm, mcpIdx, pipIdx, tipIdx) {
+  const v1 = { x: lm[mcpIdx].x - lm[pipIdx].x, y: lm[mcpIdx].y - lm[pipIdx].y };
+  const v2 = { x: lm[tipIdx].x - lm[pipIdx].x, y: lm[tipIdx].y - lm[pipIdx].y };
+  const m1 = Math.hypot(v1.x, v1.y), m2 = Math.hypot(v2.x, v2.y);
+  const cosA = (v1.x * v2.x + v1.y * v2.y) / (m1 * m2 || 1);
+  return Math.acos(Math.min(1, Math.max(-1, cosA))) * 180 / Math.PI;
+}
+// 손목 기준 거리 "비율"로 손가락 펴짐/구부림을 판정 (손이 기울어지거나 회전해도 안정적으로 동작)
+function curlRatio(lm, tipIdx, mcpIdx) {
+  return wristDist(lm, tipIdx) / (wristDist(lm, mcpIdx) || 1);
+}
+
+// 손등/손바닥 방향 판정: 손목(0)->검지뿌리(5), 손목(0)->새끼뿌리(17) 두 벡터의
+// 2D 외적(z성분) 부호가 손이 뒤집히면(=손등/손바닥이 바뀌면) 반전되는 성질을 이용.
+// 실제 테스트 결과 손바닥이 보일 때 통과되는 반대 증상이 있어(카메라에 넘기는 원본 프레임이
+// 화면에 보이는 거울 모드와 좌우가 반대라 handedness 라벨 기준이 뒤집혀 있었음)
+// FLIP_HAND_ORIENTATION을 true로 두어 부호를 반전시킴.
+const FLIP_HAND_ORIENTATION = true;
+function isBackOfHandFacing(lm, handednessLabel) {
+  const wrist = lm[0], idx = lm[5], pinky = lm[17];
+  const v1x = idx.x - wrist.x, v1y = idx.y - wrist.y;
+  const v2x = pinky.x - wrist.x, v2y = pinky.y - wrist.y;
+  const crossZ = v1x * v2y - v1y * v2x;
+  let backFacing = handednessLabel === 'Right' ? crossZ < 0 : crossZ > 0;
+  if (FLIP_HAND_ORIENTATION) backFacing = !backFacing;
+  return backFacing;
+}
+
+// 손바닥이 카메라를 향하는 "정도"(-1~1 근사). isBackOfHandFacing과 같은 외적
+// 원리지만, 부호만 보는 대신 두 벡터 길이로 정규화한 크기를 반환한다:
+// 손바닥 정면 = 큰 양수, 손을 옆으로 세움 = 0 근처, 손등 = 음수.
+// 부호 규약은 isBackOfHandFacing(FLIP 반영)과 일치시킴.
+function palmFacingScore(lm, handednessLabel) {
+  const wrist = lm[0], idx = lm[5], pinky = lm[17];
+  const v1x = idx.x - wrist.x, v1y = idx.y - wrist.y;
+  const v2x = pinky.x - wrist.x, v2y = pinky.y - wrist.y;
+  const crossZ = v1x * v2y - v1y * v2x;
+  const norm = (Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y)) || 1;
+  let palmScore = (handednessLabel === 'Right' ? -crossZ : crossZ) / norm;
+  if (!FLIP_HAND_ORIENTATION) palmScore = -palmScore;
+  return palmScore;
+}
+// 어흥에서 요구하는 최소 "손바닥 정면" 점수. 손바닥을 카메라로 향하면 0.4~0.6쯤
+// 나오고, 옆으로 돌리면 0 근처로 떨어진다. 낮추면 관대해지고 높이면 엄격해짐.
+const TIGER_PALM_FACING_MIN = 0.25;
+
+function vComponent(lm) {
+  const indexExt = isFingerExtended(lm, 8, 6);
+  const middleExt = isFingerExtended(lm, 12, 10);
+  const ringCurl = isFingerCurled(lm, 16, 14);
+  const pinkyCurl = isFingerCurled(lm, 20, 18);
+  return indexExt && middleExt && ringCurl && pinkyCurl;
+}
+
+// 3D 관절 각도: fingerBendAngle의 z 포함 버전. 손이 카메라 쪽으로 기울어
+// 화면(x,y)에서 손가락이 원근 압축돼도, 깊이(z) 성분이 살아 있어 굽힘 판정이
+// 흔들리지 않는다. z는 MediaPipe가 주는 손목 기준 상대 깊이(x와 비슷한 스케일).
+function fingerBendAngle3D(lm, mcpIdx, pipIdx, tipIdx) {
+  const v1 = {
+    x: lm[mcpIdx].x - lm[pipIdx].x,
+    y: lm[mcpIdx].y - lm[pipIdx].y,
+    z: (lm[mcpIdx].z || 0) - (lm[pipIdx].z || 0),
+  };
+  const v2 = {
+    x: lm[tipIdx].x - lm[pipIdx].x,
+    y: lm[tipIdx].y - lm[pipIdx].y,
+    z: (lm[tipIdx].z || 0) - (lm[pipIdx].z || 0),
+  };
+  const m1 = Math.hypot(v1.x, v1.y, v1.z), m2 = Math.hypot(v2.x, v2.y, v2.z);
+  const cosA = (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z) / (m1 * m2 || 1);
+  return Math.acos(Math.min(1, Math.max(-1, cosA))) * 180 / Math.PI;
+}
+
+// 두 랜드마크를 잇는 선분이 화면 평면에서 벗어난 각도(도 단위) 근사.
+// z성분이 차지하는 비율로 계산: 화면과 평행하면 0도, 카메라 쪽/반대쪽으로
+// 기울수록 커진다. 화면에서 원근 압축으로 "짧아 보이는" 정도와 직결된다.
+// (MediaPipe z는 x/y보다 정밀도가 낮아 어림값이므로 문턱은 여유 있게 잡는다)
+function segmentOutOfPlaneTiltDeg(lm, fromIdx, toIdx) {
+  const dx = lm[toIdx].x - lm[fromIdx].x;
+  const dy = lm[toIdx].y - lm[fromIdx].y;
+  const dz = (lm[toIdx].z || 0) - (lm[fromIdx].z || 0);
+  const len = Math.hypot(dx, dy, dz) || 1;
+  return Math.asin(Math.min(1, Math.abs(dz) / len)) * 180 / Math.PI;
+}
+// 엄지척에서 허용하는 "엄지"의 최대 앞뒤 기울기. 엄지(뿌리2->끝4)가 카메라
+// 쪽으로 이 각도보다 기울면 사진에서 엄지가 짧게 뭉개져 보이므로, 엄지가
+// 온전히 다 보이는 각도로 올렸을 때만 인정한다. (손 전체가 아니라 엄지 기준)
+const THUMB_MAX_TILT_DEG = 20;
+// z 기반 각도만으로는 부족한 경우를 위한 2D 보조 문턱. MediaPipe z가 실제
+// 깊이보다 작게 나오는 일이 잦아, 엄지가 90도 가까이 카메라를 향해도 각도
+// 게이트가 안 걸릴 수 있다. 그래서 화면상 엄지 길이(2->4)가 손 크기 기준
+// (손목0->중지뿌리9, 엄지척 자세에서 화면에 온전히 보이는 축)의 이 비율보다
+// 짧으면 "엄지가 원근 압축으로 짧아 보이는 상태"로 판정해 탈락시킨다.
+const THUMB_MIN_VISIBLE_RATIO = 0.55;
+
+// 엄지척: 기존엔 화면 y좌표 비교로만 판정해서 손이 카메라와 평행한 평면에
+// 있을 때만 잘 인식됐음. 손이 앞뒤로 기울면 원근 압축으로 y차이가 뭉개져 실패.
+// -> 손가락 굽힘/엄지 펴짐을 3D 관절 각도로 바꿔 기울기에 강하게 만들고,
+//    "엄지가 위"는 사진의 의미상 화면 기준을 유지하되 엄지 길이 대비 비율로
+//    판정해 손 크기·거리에 무관하게 동작하도록 함.
+function thumbsUpComponent(lm) {
+  // 엄지가 카메라 쪽으로 기울면 (인식은 가능해도) 사진에서 엄지가
+  // 짧게 보이므로 인정하지 않음 — 엄지가 다 보이는 각도로 올려야 통과.
+  // 1) z 기반 각도 게이트 (z가 정확할 때 동작)
+  if (segmentOutOfPlaneTiltDeg(lm, 2, 4) > THUMB_MAX_TILT_DEG) return false;
+  // 2) 2D 길이 비율 게이트 (z가 과소 보고돼도 원근 압축은 화면에 그대로 드러남)
+  const thumb2D = dist(lm[2], lm[4]);
+  const palm2D = dist(lm[0], lm[9]) || 1;
+  if (thumb2D < THUMB_MIN_VISIBLE_RATIO * palm2D) return false;
+  const indexCurl = fingerBendAngle3D(lm, 5, 6, 8) < 140;
+  const middleCurl = fingerBendAngle3D(lm, 9, 10, 12) < 140;
+  const ringCurl = fingerBendAngle3D(lm, 13, 14, 16) < 140;
+  const pinkyCurl = fingerBendAngle3D(lm, 17, 18, 20) < 140;
+  // 엄지 자체는 곧게 펴져 있어야 함 (굽은 엄지가 우연히 위를 향하는 오검출 방지)
+  const thumbStraight = fingerBendAngle3D(lm, 2, 3, 4) > 140;
+  // 엄지 방향 벡터(2->4)의 위쪽(y-) 성분이 엄지 길이의 35% 이상 = 수평보다 약 20도 이상 위
+  const thumbLen = Math.hypot(
+    lm[4].x - lm[2].x, lm[4].y - lm[2].y, (lm[4].z || 0) - (lm[2].z || 0)
+  );
+  const thumbUp = (lm[2].y - lm[4].y) > 0.35 * thumbLen;
+  return indexCurl && middleCurl && ringCurl && pinkyCurl && thumbStraight && thumbUp;
+}
+
+// 어흥(호랑이 발톱): 손바닥이 보이도록 들고, 손톱이 보이는 정도로만 살짝 구부린 상태
+// (기존엔 거의 주먹 수준으로 구부려야 인식돼서, 살짝만 구부려도 인식되도록 범위를 완화함)
+function tigerClawComponent(lm, handednessLabel) {
+  // 손바닥이 카메라를 향할 때만 인정 — 손등을 보이거나 옆으로 세운 손은 탈락
+  if (palmFacingScore(lm, handednessLabel) < TIGER_PALM_FACING_MIN) return false;
+  const fingers = [[8, 5], [12, 9], [16, 13], [20, 17]]; // [tip, mcp]
+  return fingers.every(([tip, mcp]) => {
+    const dTip = wristDist(lm, tip);
+    const dMcp = wristDist(lm, mcp);
+    // 완전히 쫙 편 상태(약 1.9배)만 아니면 되고, 주먹처럼 완전히 접힌 상태(0.75 미만)만 아니면 인정
+    // (1.5는 손가락을 꽤 많이 굽혀야 통과돼서 너무 엄격했음 -> 1.7로 완화, 살짝만 굽혀도 인정)
+    return dTip > dMcp * 0.75 && dTip < dMcp * 1.7;
+  });
+}
+
+// 고양이 귀: 검지·중지를 곧게 편 채로 넓게 벌려서(V보다 더 벌어진 삼각형 모양), 손목이
+// 손끝보다 위(더 높은 곳)에 있도록 손을 뒤집어(손등이 보이게) 손끝이 머리에 닿는 모양.
+// (직전 버전은 손목-손끝 위아래 관계를 안 봐서, 손가락이 위로 향한 일반 브이 사인도
+//  똑같이 통과돼버렸음. "손목이 손끝보다 위에 있는지"만 다시 검사해서 방향을 구분함 -
+//  손목/손끝 두 점만 비교하므로, 팔 전체가 대각선으로 들려도 흔들리지 않음)
+function catEarsComponent(lm) {
+  // 검지·중지가 곧게 펴져 있는지 (완전히 편 손가락은 관절 각도가 180도에 가까움)
+  const indexStraight = fingerBendAngle(lm, 5, 6, 8) > 140;
+  const middleStraight = fingerBendAngle(lm, 9, 10, 12) > 140;
+  if (!indexStraight || !middleStraight) return false;
+
+  // 약지·소지는 주먹처럼 접혀야 함 (관절 각도 기준, 회전에 영향받지 않음)
+  const ringCurl = fingerBendAngle(lm, 13, 14, 16) < 140;
+  const pinkyCurl = fingerBendAngle(lm, 17, 18, 20) < 140;
+
+  // 손목(0)이 검지·중지 손끝보다 위(작은 y)에 있어야 함 = 손등 쪽이 위, 손끝이 머리 쪽 아래
+  // (일반 브이 사인처럼 손가락이 손목보다 위로 향하면 이 조건에서 걸러짐)
+  const wristAboveFingers = lm[0].y < lm[8].y && lm[0].y < lm[12].y;
+
+  // 손목(0)을 꼭짓점으로 검지 끝(8)·중지 끝(12)까지의 벌어진 각도
+  const v1 = { x: lm[8].x - lm[0].x, y: lm[8].y - lm[0].y };
+  const v2 = { x: lm[12].x - lm[0].x, y: lm[12].y - lm[0].y };
+  const mag1 = Math.hypot(v1.x, v1.y), mag2 = Math.hypot(v2.x, v2.y);
+  const cosA = (v1.x * v2.x + v1.y * v2.y) / (mag1 * mag2 || 1);
+  const angleDeg = Math.acos(Math.min(1, Math.max(-1, cosA))) * 180 / Math.PI;
+  const angleOk = angleDeg > 10; // 브이 사인보다 넉넉히 벌어져 있으면 인정 (상한 없음)
+
+  // (예전엔 손끝이 화면 상위 60% 안에 있어야 하는 nearHead 조건이 있었으나 제거함.
+  //  화면 절대좌표 기준이라 사람이 프레임 어디에 잡히느냐에 따라 같은 동작이
+  //  통과/탈락이 갈렸음. 얼굴 좌표를 실제로 감지하지 않는 이상 "머리 근처"를
+  //  화면 위치로 추정할 수 없고, 손을 뒤집는 wristAboveFingers 조건이 이미
+  //  이 포즈의 방향 특징을 충분히 구분해준다.)
+
+  return ringCurl && pinkyCurl && indexStraight && middleStraight && wristAboveFingers && angleOk;
+}
+
+// 볼하트: 엄지와 검지를 붙이지 않고, 살짝 구부려 반쪽 하트(둥근 곡선) 모양을 만들어
+// 볼 옆에 대는 동작. (기존엔 엄지-검지 끝을 붙이는 핀치 조건이라 사실상 손하트와
+// 똑같이 판정됐음. 붙지 않고 벌어진 채 곡선을 이루는 상태로 조건을 바꿈)
+// 얼굴 가까이서 촬영하면(=손이 화면을 크게 채우면) 절대 좌표 기준 거리는 훨씬 커지고,
+// 손이 살짝 돌아가면 y좌표 차이로 굽힘을 판정하는 방식이 흔들리기 쉬움. 그래서 모든
+// 거리를 "손 크기(손목~중지 마디)" 대비 비율로 계산해 카메라 거리·각도 변화에 안정적으로 만듦.
+// 볼하트에서 허용하는 "손바닥 방향" 점수 띠 (palmFacingScore 재사용).
+// 볼에 손을 대는 자연스러운 자세는 손바닥이 대체로 옆을 향하므로 0 근처가 중심.
+// 하한만 두면(이전 0.05) 손바닥을 정면으로 활짝 돌린 부자연스러운 자세는
+// 무제한 통과하고, 반대로 손이 조금만 돌아가면 바로 탈락하는 비대칭이 생김.
+// -> 살짝 돌아간 것(음수 소폭)은 허용하고, 정면으로 활짝 편 것(큰 양수)은 거른다.
+const CHEEK_PALM_FACING_MIN = -0.25;
+const CHEEK_PALM_FACING_MAX = 0.5;
+
+function cheekHeartComponent(lm, handednessLabel) {
+  const handScale = wristDist(lm, 9) || 0.001;
+  // 손바닥 방향이 자연스러운 띠 안에 있어야 함 — 손등을 확 보이거나(큰 음수),
+  // 손바닥을 정면으로 활짝 돌린 자세(큰 양수)는 둘 다 탈락
+  const palmScore = palmFacingScore(lm, handednessLabel);
+  const palmOk = palmScore >= CHEEK_PALM_FACING_MIN && palmScore <= CHEEK_PALM_FACING_MAX;
+  // 네 손가락 "살짝 구부림"을 3D 관절 각도로 판정. 이전의 손끝/뿌리 거리 비율
+  // 방식은 "편 채로 카메라 쪽으로 기울인 손가락"이 원근 압축 때문에 굽힌 것처럼
+  // 읽히는 맹점이 있었음(검지만 펴도 통과되던 원인). 관절 각도는 기울기에
+  // 불변: 쫙 폄 ~175도, 살짝 굽힘 130~160도, 주먹 60~90도.
+  // 하한은 "주먹 차단"용. 상방을 140으로 낮춰 "거의 편 손"이 섞이는 걸 더 확실히 막는다.
+  const bendOk = (mcp, pip, tip, lo = 70, hi = 140) => {
+    const a = fingerBendAngle3D(lm, mcp, pip, tip);
+    return a > lo && a < hi;
+  };
+  // 소지는 해부학적으로 다른 손가락을 굽힐 때 따라 굽거나 덜 굽어서 각도가 잘
+  // 튀므로(네 손가락 AND 구조에서 가장 자주 발목을 잡음) 범위만 넓게 둔다.
+  const bentOk = bendOk(5, 6, 8) && bendOk(9, 10, 12) && bendOk(13, 14, 16) && bendOk(17, 18, 20, 65, 140);
+  // PIP 각도(3점 측정)는 완만~중간 굽힘에서는 단조 감소하지만, 손가락을 끝까지
+  // 말면(꽉 쥔 주먹) 손끝이 DIP에서 한 번 더 꺾여 손바닥 쪽으로 파고들면서
+  // PIP→TIP 벡터가 PIP→MCP와 다시 비슷한 방향이 돼 각도가 역전(다시 커짐)한다.
+  // 그래서 각도만으로는 "완전한 주먹"을 못 거른다. 손끝-손목 거리 비율은 말수록
+  // 계속 가까워지기만 해서(역전 없음) 이 극단 구간을 잡는 안전장치로 추가한다.
+  // 문턱 실측 근거: 주먹 0.66~0.73 / 정상 볼하트 1.2~1.55 → 0.9면 확실히 갈라짐
+  const notTightFist = (tip, mcp) => curlRatio(lm, tip, mcp) > 0.9;
+  const notFistOk = notTightFist(8, 5) && notTightFist(12, 9) && notTightFist(16, 13) && notTightFist(20, 17);
+  const gapRatio = dist(lm[4], lm[8]) / handScale;
+  const gapOk = gapRatio > 0.15 && gapRatio < 1.5; // 완전히 붙지도(핀치), 너무 벌어지지도 않게
+  // 테스트 모드에서 어떤 조건이 실패하는지 실시간 확인용 (loop에서 스로틀 출력)
+  if (DEBUG_POSE) {
+    const a = (mcp, pip, tip) => fingerBendAngle3D(lm, mcp, pip, tip).toFixed(0);
+    const r = (t, m) => curlRatio(lm, t, m).toFixed(2);
+    window.__poseDebug =
+      `볼하트 · 관절각(70~140도, 소지는 65~140 필요): 검지 ${a(5, 6, 8)} 중지 ${a(9, 10, 12)} 약지 ${a(13, 14, 16)} 소지 ${a(17, 18, 20)}` +
+      ` · 주먹방지비(0.9 초과 필요): 검지 ${r(8, 5)} 중지 ${r(12, 9)} 약지 ${r(16, 13)} 소지 ${r(20, 17)}` +
+      ` · 간격비(0.15~1.5 필요): ${gapRatio.toFixed(2)}` +
+      ` · 손바닥점수(${CHEEK_PALM_FACING_MIN}~${CHEEK_PALM_FACING_MAX} 필요): ${palmScore.toFixed(2)}` +
+      ` · MP라벨: ${handednessLabel || '?'}`;
+  }
+  // (예전엔 검지 끝이 화면 상위 80% 안이어야 하는 upperArea 조건이 있었으나 제거함.
+  //  화면 절대좌표라 사람이 프레임 어디에 잡히느냐에 좌우됨 — 얼굴 좌표를 실제로
+  //  감지하지 않는 이상 "볼 근처"를 화면 위치로 추정할 수 없다는 원칙에 따름)
+  return palmOk && bentOk && notFistOk && gapOk;
+}
+
+// 손 크기: 랜드마크 21개 전체의 화면상 바운딩박스 대각선.
+// 손목~중지뿌리 같은 특정 선분은 손이 기울면 투영이 쪼그라들지만,
+// 바운딩박스는 손이 어느 방향으로 돌아도 크기가 잘 유지된다.
+function handSpan2D(lm) {
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  for (const p of lm) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return Math.hypot(maxX - minX, maxY - minY) || 0.001;
+}
+
+// 꽃받침: 손가락을 붙여서 펴고, 턱 밑에 컵처럼 받치는 모양.
+// 한 손만 해도 인정하므로 다른 한-손 포즈처럼 손별 컴포넌트로 판정한다
+// (감지된 모든 손이 이 모양이어야 통과 — 양손 꽃받침도 자연히 통과).
+// 기존 판정의 문제 3가지를 교체:
+//  1) 펴짐을 화면 y좌표 비교로 판정 -> 손이 기울면 실패. 3D 관절 각도로 교체
+//  2) 붙임을 절대거리(0.06)로 판정 -> 카메라 거리에 따라 오판. 손 크기 비율로 교체
+//  3) "턱 높이"를 화면 절대좌표(0.25~0.75)로 추정 -> 프레이밍에 좌우되므로 제거하고,
+//     컵 모양의 방향 특징인 "손끝이 손목보다 위"(상대 비교)로 대체
+function flowerComponent(lm, handedness) {
+  // 네 손가락이 펴져 있는지 (3D 관절 각도 — 컵처럼 살짝 오므리는 것까지 허용).
+  // 손가락을 붙이면 이웃 손가락이 서로를 가려 개별 랜드마크가 프레임마다
+  // 흔들리고, AND 판정은 한 손가락만 튀어도 깨져서 유독 불안정했음.
+  // -> 네 손가락 각도의 "평균"으로 그룹 판정: 무작위 노이즈가 상쇄되고,
+  //    꽃받침은 네 손가락이 한 면을 이루는 포즈라 의미상으로도 그룹이 맞음.
+  const angIdx = fingerBendAngle3D(lm, 5, 6, 8);
+  const angMid = fingerBendAngle3D(lm, 9, 10, 12);
+  const angRing = fingerBendAngle3D(lm, 13, 14, 16);
+  const angPinky = fingerBendAngle3D(lm, 17, 18, 20);
+  const avgAngle = (angIdx + angMid + angRing + angPinky) / 4;
+  // 하한 125도: 손바닥이 카메라 쪽으로 조금 돌아가면 오므린 손가락이 카메라를
+  // 향해 관절각이 더 접힌 값으로 나오므로, 135로 두면 손바닥 보이는 꽃받침이 탈락했음.
+  const allExt = avgAngle > 125;
+  // 이웃한 손끝끼리 붙어 있는지 (손 크기 비율 — 붙인 손가락은 약 0.1, 벌리면 0.2+)
+  const span = handSpan2D(lm);
+  const g1 = dist(lm[8], lm[12]) / span;
+  const g2 = dist(lm[12], lm[16]) / span;
+  const g3 = dist(lm[16], lm[20]) / span;
+  // 0.22: 손바닥이 카메라 쪽으로 돌아가면 원근 때문에 손 크기 대비 간격비가
+  // 커져서, 0.18로는 손바닥 보이는 꽃받침이 탈락했음 (벌린 손가락은 0.25+).
+  const closeGaps = g1 < 0.22 && g2 < 0.22 && g3 < 0.22;
+  // 손끝이 손목보다 위 = 컵이 위를 향한 방향 (턱을 받치는 모양)
+  const pointingUp = lm[8].y < lm[0].y && lm[12].y < lm[0].y && lm[16].y < lm[0].y && lm[20].y < lm[0].y;
+  // 손 축(손목→중지 끝)이 수직에서 20도 이상 기울어야 함: 꽃받침은 턱을
+  // 받치느라 손이 얼굴 쪽으로 기울지만, 손가락을 붙여 편 손을 그냥 위로
+  // 세워 든 자세는 수직(0도 근처)이라 여기서 걸러진다.
+  const axisX = lm[12].x - lm[0].x;
+  const axisY = lm[12].y - lm[0].y;
+  const axisLen = Math.hypot(axisX, axisY) || 0.001;
+  const handTiltDeg = Math.acos(Math.min(1, Math.max(-1, -axisY / axisLen))) * 180 / Math.PI;
+  const tiltedEnough = handTiltDeg > 20;
+  // 손등이 카메라를 정면으로 향하면 꽃받침이 아니라 손등을 내민 자세.
+  // 손바닥 정면 = 양수, 옆으로 세움 = 0 근처, 손등 정면 = -0.4 이하로 나오므로
+  // -0.25까지는 허용해 "손등이 살짝 보이는" 각도는 통과시킨다.
+  const palmScore = palmFacingScore(lm, handedness);
+  const notBackFacing = palmScore > -0.25;
+  if (DEBUG_POSE) {
+    window.__poseDebug =
+      `꽃받침 · 관절각 평균(125 초과 필요): ${avgAngle.toFixed(0)}` +
+      ` (검지 ${angIdx.toFixed(0)} 중지 ${angMid.toFixed(0)} 약지 ${angRing.toFixed(0)} 소지 ${angPinky.toFixed(0)})` +
+      ` · 손끝간격비(각 0.22 미만): ${g1.toFixed(2)} ${g2.toFixed(2)} ${g3.toFixed(2)}` +
+      ` · 손끝이위: ${pointingUp ? 'O' : 'X'}` +
+      ` · 손기울기(20도 초과 필요): ${handTiltDeg.toFixed(0)}도` +
+      ` · 손바닥점수(-0.25 초과 필요): ${palmScore.toFixed(2)}`;
+  }
+  return allExt && closeGaps && pointingUp && tiltedEnough && notBackFacing;
+}
+
+// 숭이포즈: 검지손가락 끝이 입꼬리(입 주변) 높이에 있으면 인정.
+// 손톱쪽을 깨물듯 살짝 구부려도, 그냥 붙여도 되므로 검지 자체의 펴짐/구부림은 따지지 않음.
+function mouthPoseComponent(lm) {
+  const middleCurl = curlRatio(lm, 12, 9) < 1.1;
+  const ringCurl = curlRatio(lm, 16, 13) < 1.1;
+  const pinkyCurl = curlRatio(lm, 20, 17) < 1.1;
+  const indexNearMouth = lm[8].y > 0.3 && lm[8].y < 0.78; // 입 주변 높이 범위
+  return middleCurl && ringCurl && pinkyCurl && indexNearMouth;
+}
+
+// 야호포즈: 브이를 뒤집은 모양. 검지·중지가 펴진 채로 "뿌리보다 아래쪽"을 향해야 함(손톱이 바닥 방향)
+// 인식은 메인 루프에서 프레임을 180도 돌려 수행하므로(detectHandsRotated180 참고)
+// 여기 들어오는 랜드마크는 대부분 정상 품질이다. 아래의 복구판정은 회전 인식이
+// 실패해 일반 인식으로 폴백한 프레임을 위한 안전망으로만 남겨둔다.
+function yahooComponent(lm, _handedness, worldLm) {
+  // 화면 랜드마크가 손을 옆으로 돌렸을 때 손바닥 쪽으로 뭉쳐도 관절각은
+  // 실제 손 크기·깊이 기준의 월드 랜드마크로 계산한다. 월드 값이 없는
+  // 환경에서만 기존 화면 랜드마크를 대신 사용한다.
+  const poseLm = worldLm && worldLm.length === lm.length ? worldLm : lm;
+  // 화면상 손끝 거리비는 손이 앞뒤로 흔들릴 때 경계값을 자주 넘나들므로
+  // 펴짐은 3D 관절각으로 판정한다. 한 손가락의 미세 노이즈도 허용하도록
+  // 각각의 하한과 두 손가락 평균 하한을 함께 사용한다.
+  const indexAngle = fingerBendAngle3D(poseLm, 5, 6, 8);
+  const middleAngle = fingerBendAngle3D(poseLm, 9, 10, 12);
+  const extendedOk = indexAngle > 120 && middleAngle > 120 && (indexAngle + middleAngle) / 2 > 135;
+
+  // 절대 y좌표차(기존 0.03) 대신 각 손가락 화면 길이 중 아래 방향 성분의
+  // 비율을 본다. 손이 화면에서 작거나 커져도 같은 자세는 같은 값이 나온다.
+  const downRatio = (mcp, tip) => {
+    const dx = lm[tip].x - lm[mcp].x;
+    const dy = lm[tip].y - lm[mcp].y;
+    return dy / (Math.hypot(dx, dy) || 0.001);
+  };
+  const indexDown = downRatio(5, 8);
+  const middleDown = downRatio(9, 12);
+  // 손바닥을 카메라 정면으로 많이 보이지 않아도 되도록 각 손가락은 거의
+  // 수평까지 허용하고, 두 손가락의 평균 방향만 아래쪽이면 인정한다.
+  const pointingDown = indexDown > -0.05 && middleDown > -0.05 &&
+    (indexDown + middleDown) / 2 > 0.1;
+
+  // 약지·소지는 기존 1.05보다 여유 있는 거리비와 관절각을 함께 사용한다.
+  // 접힌 상태 안에서 랜드마크가 조금 흔들려도 판정이 끊기지 않게 한다.
+  const ringAngle = fingerBendAngle3D(poseLm, 13, 14, 16);
+  const pinkyAngle = fingerBendAngle3D(poseLm, 17, 18, 20);
+  const foldedOk = ringAngle < 165 && pinkyAngle < 165 &&
+    curlRatio(lm, 16, 13) < 1.4 && curlRatio(lm, 20, 17) < 1.4;
+
+  // 손끝 랜드마크가 손바닥으로 뭉친 프레임을 위한 복구 판정.
+  // 이 상황에서도 손목(0)과 네 손가락 뿌리(5/9/13/17)는 비교적 안정적이다.
+  // 뒤집힌 손에서는 손가락 뿌리들의 중심이 손목보다 화면 아래에 있으므로,
+  // 이 손바닥 축 방향을 손끝의 아래방향 판정 대신 사용한다.
+  const mcpCenterY = (lm[5].y + lm[9].y + lm[13].y + lm[17].y) / 4;
+  const palmAxisLength = Math.hypot(lm[9].x - lm[0].x, lm[9].y - lm[0].y) || 0.001;
+  const palmDownRatio = (mcpCenterY - lm[0].y) / palmAxisLength;
+  const palmPointsDown = palmDownRatio > 0.2;
+  // 스크린샷처럼 손끝 추정이 무너지면 펴진 손가락 각도도 120도 부근까지
+  // 낮아지므로 복구 경로만 더 관대하게 본다. 반면 약지·소지가 모두 펴진
+  // 손바닥(대개 170도+)은 각도 상한으로 계속 제외한다.
+  const fallbackExtendedOk = indexAngle > 105 && middleAngle > 105 &&
+    (indexAngle + middleAngle) / 2 > 120;
+  const fallbackFoldedOk = ringAngle < 168 && pinkyAngle < 168;
+  const fallbackOk = palmPointsDown && fallbackExtendedOk && fallbackFoldedOk;
+  const preciseOk = extendedOk && pointingDown && foldedOk;
+
+  if (DEBUG_POSE) {
+    window.__poseDebug =
+      `야호 · 편 손가락 월드각도(각 120 초과, 평균 135 초과): ${indexAngle.toFixed(0)} / ${middleAngle.toFixed(0)}` +
+      ` · 아래방향비(각 -0.05 초과, 평균 0.1 초과): ${indexDown.toFixed(2)} / ${middleDown.toFixed(2)}` +
+      ` · 접은 손가락 월드각도(각 165 미만): ${ringAngle.toFixed(0)} / ${pinkyAngle.toFixed(0)}` +
+      ` · 접힘거리비(각 1.4 미만): ${curlRatio(lm, 16, 13).toFixed(2)} / ${curlRatio(lm, 20, 17).toFixed(2)}` +
+      ` · 손바닥아래방향비(복구판정 0.2 초과): ${palmDownRatio.toFixed(2)}` +
+      ` · 판정경로: ${preciseOk ? '정밀' : fallbackOk ? '복구' : '실패'}`;
+  }
+  return preciseOk || fallbackOk;
+}
+
+// 놀라는 포즈(id: palmpose): 손등이 카메라를 향하고, 엄지 포함 5손가락이 모두 펴져서
+// 서로 붙지 않고 사이사이 틈이 벌어져 있어야 함. 두 손 중 한 손만 이 모양이어도 인정.
+function palmPoseHandComponent(lm, handedness) {
+  const fourExtended = [[8, 5], [12, 9], [16, 13], [20, 17]]
+    .every(([tip, mcp]) => curlRatio(lm, tip, mcp) > 1.15);
+  const thumbExtended = curlRatio(lm, 4, 2) > 1.15;
+  const palmWidth = dist(lm[5], lm[17]) || 1; // 손 크기로 정규화
+  const gaps = [dist(lm[4], lm[8]), dist(lm[8], lm[12]), dist(lm[12], lm[16]), dist(lm[16], lm[20])];
+  const spread = gaps.every(g => (g / palmWidth) > 0.35); // 손가락 사이 틈이 충분히 벌어져야 함
+  const backFacing = isBackOfHandFacing(lm, handedness);
+  return fourExtended && thumbExtended && spread && backFacing;
+}
+
+// 락앤롤 포즈 🤟: 엄지·검지·새끼는 펴고, 중지·약지는 완전히 접기
+function rockAndRollComponent(lm) {
+  const indexExtended = curlRatio(lm, 8, 5) > 1.15;
+  const pinkyExtended = curlRatio(lm, 20, 17) > 1.15;
+  const thumbExtended = curlRatio(lm, 4, 2) > 1.15;
+  const middleCurl = curlRatio(lm, 12, 9) < 1.05;
+  const ringCurl = curlRatio(lm, 16, 13) < 1.05;
+  return indexExtended && pinkyExtended && thumbExtended && middleCurl && ringCurl;
+}
+
+const COMPONENTS = {
+  v: vComponent,
+  thumbsup: thumbsUpComponent,
+  tigerclaw: tigerClawComponent,
+  catears: catEarsComponent,
+  cheekheart: cheekHeartComponent,
+  flower: flowerComponent,
+  mouthpose: mouthPoseComponent,
+  yahoo: yahooComponent,
+  palmpose: palmPoseHandComponent,
+  rocknroll: rockAndRollComponent,
+};
+
+// 화면에 감지된 손이 몇 개든(=몇 명이든) 전부 만족해야 인정.
+// handedness(왼손/오른손)가 필요한 컴포넌트(손바닥 포즈 등)에도 쓸 수 있도록 함께 전달.
+function makeChecker(gestureId, minHands) {
+  const component = COMPONENTS[gestureId];
+  return function (hands, handednesses, worldHands) {
+    if (hands.length < minHands) return false;
+    return hands.every((lm, i) => component(
+      lm,
+      handednesses ? handednesses[i] : undefined,
+      worldHands ? worldHands[i] : undefined
+    ));
+  };
+}
+
+// 한두 프레임의 랜드마크 흔들림으로 판정이 바뀌지 않도록 최근 결과를 다수결로 평활화한다.
+// 개별 프레임의 ok는 기존과 동일하게 감지된 모든 손이 동작을 만족할 때만 true다.
+// 추가로 손 개수도 함께 기록한다: 판정이 "감지된 손"에만 적용되다 보니, 자세가
+// 틀린 손이 감지에서 깜빡이며 빠지면 그 프레임들이 전부 성공으로 계산돼
+// "반대 손만 잘하면 둘 다 통과"가 되는 구멍이 있었음. 최근 윈도우에서 관측된
+// 최대 손 개수보다 적게 감지된 프레임은 성공으로 치지 않아 이를 막는다.
+function smoothDetection(ok, handCount, gestureId) {
+  detectionHistory.push({ ok, handCount });
+  if (detectionHistory.length > DETECTION_WINDOW_SIZE) {
+    detectionHistory.shift();
+  }
+  const expectedHands = Math.max(...detectionHistory.map(h => h.handCount));
+  const hitCount = detectionHistory.filter(h => h.ok && h.handCount >= expectedHands).length;
+  // 손이 4개 이상 잡히는 다인 촬영은 어떤 포즈든 한 손씩 검출이 자주 깜빡여
+  // 프레임 단위 실패가 잦으므로 완화 기준을 적용한다 (1~2인 판정은 그대로).
+  const requiredHits = gestureId === 'yahoo' || SPECIAL_CHECKERS[gestureId] || expectedHands >= 4
+    ? RELAXED_DETECTION_REQUIRED_HITS
+    : DETECTION_REQUIRED_HITS;
+  return hitCount >= requiredHits;
+}
+
+function resetDetectionStability() {
+  detectionHistory = [];
+  detectionFailureStartTs = null;
+}
+
+// 양손하트(양손 결합): 주먹을 맞대는 게 아니라, 양손을 둥글게 구부려
+// 검지 끝(하트 윗부분 골)과 엄지 끝(하트 아랫부분 뾰족한 점)이 각각 서로 맞닿도록
+// 만드는 동작.
+// 다른 제스처와 달리 "손끼리의 관계"를 봐야 해서 별도 로직으로 처리.
+// 여러 명이 함께할 때는 makePairChecker가 가까운 손끼리 짝지어 이 함수를 쌍마다 호출한다.
+function bigHeartPair(a, b) {
+  // 거리 문턱을 절대값(0.12)이 아니라 손 크기 비율로 계산: 절대값은 카메라에서
+  // 멀어져 손이 작아지면 "떨어진 두 손"도 가깝다고 오판했음 (실제 버그였음).
+  // 손 크기는 랜드마크 21개 전체의 화면상 바운딩박스 대각선을 사용한다 —
+  // 손목~중지뿌리 거리를 썼더니 하트를 만들며 손이 기울면 손바닥 투영이
+  // 짧아져 scale이 쪼그라들고, 간격비가 뻥튀기돼 정면 손만 통과되는 문제가 있었음.
+  const span = (h) => {
+    let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (const p of h) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return Math.hypot(maxX - minX, maxY - minY) || 0.001;
+  };
+  const scale = (span(a) + span(b)) / 2;
+  const indexGap = dist(a[8], b[8]) / scale;
+  const thumbGap = dist(a[4], b[4]) / scale;
+  // 두 손이 실제로 맞닿아야 통과: 맞닿은 손끝은 간격비가 대략 0.05~0.15로
+  // 나오므로 0.22면 랜드마크 노이즈 여유를 포함한 "붙음" 판정이 된다.
+  // (예전 0.4는 살짝 벌어진 하트도 통과시켰음. 엄밀한 맞닿음 요구가 프레임
+  // 단위 AND 때문에 인식 불능을 만들던 문제는 지금은 10프레임 중 6프레임
+  // 다수결이 흡수한다.)
+  const indexTipsClose = indexGap < 0.22; // 검지 끝끼리 맞닿음 (하트 윗부분 골)
+  const thumbTipsClose = thumbGap < 0.22; // 엄지 끝끼리 맞닿음 (하트 아랫부분 꼭짓점)
+  // 방향 판정은 화면 위/아래가 아니라 "하트 축"을 기준으로 한다: 화면 기준으로
+  // 보면 하트를 통째로 기울였을 때(고개를 갸웃하며 찍는 스타일) 멀쩡한 하트가
+  // 탈락했음. 축은 엄지 끝 중점(아래 꼭짓점) → 검지 끝 중점(위쪽 골) 방향.
+  const heartUp = {
+    x: (a[8].x + b[8].x) / 2 - (a[4].x + b[4].x) / 2,
+    y: (a[8].y + b[8].y) / 2 - (a[4].y + b[4].y) / 2,
+  };
+  const heartUpLen = Math.hypot(heartUp.x, heartUp.y) || 0.001;
+  heartUp.x /= heartUpLen;
+  heartUp.y /= heartUpLen;
+  // 다만 뒤집힌 하트는 배제: 축이 화면 위쪽에서 100도 이내.
+  // (90도 = 완전히 옆으로 눕힌 하트까지 허용하고, 랜드마크 노이즈 여유로 +10도)
+  const tiltDeg = Math.acos(Math.min(1, Math.max(-1, -heartUp.y))) * 180 / Math.PI;
+  const uprightEnough = tiltDeg <= 100;
+  // 검지 끝이 엄지 끝보다 "하트 위쪽"에 있어야 함 (뒤집어 맞댄 손 오검출 방지)
+  const alongUp = (from, to) => (to.x - from.x) * heartUp.x + (to.y - from.y) * heartUp.y;
+  const orientedUp = alongUp(a[4], a[8]) > 0 && alongUp(b[4], b[8]) > 0;
+  // 엄지가 "하트 아래쪽"을 향해야 함 (하트 아래 꼭짓점을 만드는 방향).
+  // 엄지 뿌리(2)->끝(4) 벡터의 하트 아래방향 성분 비율. 문턱 0.05 =
+  // "위로 향하지만 않으면 됨". 수평으로 마주 대는 스타일도 허용.
+  const thumbDownRatio = (h) => -alongUp(h[2], h[4]) / (dist(h[2], h[4]) || 0.001);
+  const thumbsDown = thumbDownRatio(a) > 0.05 && thumbDownRatio(b) > 0.05;
+  // 하트의 둥근 어깨: 두 손의 검지 뿌리(5)가 좌우로 벌어져 있어야 함.
+  // 손끝만 맞닿고 가운데가 불룩한 게 하트 — 손바닥을 평평하게 모아 붙인
+  // 기도 자세(뿌리까지 다 붙음)를 걸러낸다.
+  const lobeGap = dist(a[5], b[5]) / scale;
+  const lobesApart = lobeGap > 0.2; // 손바닥을 완전히 모아 붙인 자세만 거르는 수준
+  if (DEBUG_POSE) {
+    window.__poseDebug =
+      `양손하트 · 검지간격비(0.22 미만): ${indexGap.toFixed(2)}` +
+      ` · 엄지간격비(0.22 미만): ${thumbGap.toFixed(2)}` +
+      ` · 어깨벌어짐비(0.2 초과): ${lobeGap.toFixed(2)}` +
+      ` · 엄지아래방향(0.05 초과): ${thumbDownRatio(a).toFixed(2)} / ${thumbDownRatio(b).toFixed(2)}` +
+      ` · 검지가엄지위(하트축 기준): ${orientedUp ? 'O' : 'X'}` +
+      ` · 하트기울기(100도 이하): ${tiltDeg.toFixed(0)}도`;
+  }
+  return indexTipsClose && thumbTipsClose && orientedUp && thumbsDown && lobesApart && uprightEnough;
+}
+
+// 두 손 결합 포즈(양손하트)를 여러 명이 함께할 수 있도록 확장.
+// 예전엔 손이 정확히 2개일 때만 판정해서, 두 명이 각자 하트를 만들면
+// 손 4개가 감지돼 아예 인식되지 않았다. 감지된 손을 가까운 손끼리 짝짓고
+// (같은 하트/받침을 만드는 두 손은 다른 사람 손보다 항상 가깝다),
+// 모든 짝이 포즈를 만족해야 인정한다. 홀수 개면 짝 없는 손이 있으므로 실패.
+// 오버레이 색은 짝 단위로 칠할 수 있게 손별 결과를 lastPairPerHandOk에 남긴다.
+let lastPairPerHandOk = null;
+function makePairChecker(pairFn, label) {
+  return function (hands) {
+    lastPairPerHandOk = hands.map(() => false);
+    if (hands.length < 2 || hands.length % 2 !== 0) {
+      if (DEBUG_POSE) {
+        window.__poseDebug = `${label} · 감지된 손 ${hands.length}개 — 두 손씩 짝을 지을 수 없음`;
+      }
+      return false;
+    }
+    const centroid = (hand) => {
+      let sx = 0, sy = 0;
+      for (const p of hand) { sx += p.x; sy += p.y; }
+      return { x: sx / hand.length, y: sy / hand.length };
+    };
+    const centers = hands.map(centroid);
+    // 전체에서 가장 가까운 두 손부터 차례로 짝짓는다 (손 4개면 2쌍).
+    const remaining = hands.map((_, i) => i);
+    const pairs = [];
+    while (remaining.length > 1) {
+      let best = null;
+      for (let i = 0; i < remaining.length; i++) {
+        for (let j = i + 1; j < remaining.length; j++) {
+          const d = Math.hypot(
+            centers[remaining[i]].x - centers[remaining[j]].x,
+            centers[remaining[i]].y - centers[remaining[j]].y
+          );
+          if (!best || d < best.d) best = { i, j, d };
+        }
+      }
+      pairs.push([remaining[best.i], remaining[best.j]]);
+      remaining.splice(best.j, 1);
+      remaining.splice(best.i, 1);
+    }
+    const debugs = [];
+    const results = pairs.map(([i, j]) => {
+      const ok = pairFn(hands[i], hands[j]);
+      lastPairPerHandOk[i] = ok;
+      lastPairPerHandOk[j] = ok;
+      if (DEBUG_POSE && window.__poseDebug) {
+        debugs.push(window.__poseDebug);
+        window.__poseDebug = null;
+      }
+      return ok;
+    });
+    if (DEBUG_POSE) {
+      window.__poseDebug = pairs.length > 1
+        ? `${label} ${pairs.length}쌍 판정 → ` + debugs.join(' ‖ ')
+        : debugs[0] || null;
+    }
+    return results.every(Boolean);
+  };
+}
+
+const SPECIAL_CHECKERS = {
+  bigheart: makePairChecker(bigHeartPair, '양손하트'),
+};
+
+const CHECKERS = {};
+GESTURES.forEach(g => {
+  CHECKERS[g.id] = SPECIAL_CHECKERS[g.id] || makeChecker(g.id, g.minHands);
+});
+
+// ---------- 메인 루프 ----------
+// 야호 전용 인식 경로: 손 모델은 손가락이 위를 향한 손 위주로 학습돼 있어
+// 뒤집힌 손은 손끝 랜드마크가 손바닥 쪽으로 뭉치게 추정된다(마커가 손바닥에
+// 모이는 문제의 원인). 프레임을 180도 돌려 뒤집힌 브이를 정상 브이로 보이게
+// 인식한 뒤, 좌표를 원래 방향으로 되돌린다.
+let rot180Canvas = null;
+let rot180Ctx = null;
+function detectHandsRotated180() {
+  if (!rot180Canvas) {
+    rot180Canvas = document.createElement('canvas');
+    rot180Ctx = rot180Canvas.getContext('2d', { willReadFrequently: true });
+  }
+  if (rot180Canvas.width !== video.videoWidth || rot180Canvas.height !== video.videoHeight) {
+    rot180Canvas.width = video.videoWidth;
+    rot180Canvas.height = video.videoHeight;
+  }
+  rot180Ctx.save();
+  rot180Ctx.translate(rot180Canvas.width, rot180Canvas.height);
+  rot180Ctx.rotate(Math.PI);
+  rot180Ctx.drawImage(video, 0, 0);
+  rot180Ctx.restore();
+  const r = handLandmarker.detectForVideo(rot180Canvas, performance.now());
+  return {
+    // 화면 좌표는 (1-x, 1-y), 월드 좌표는 (-x, -y)로 되돌리면 원본 프레임 기준이 된다.
+    landmarks: (r.landmarks || []).map(hand => hand.map(p => ({ x: 1 - p.x, y: 1 - p.y, z: p.z }))),
+    worldLandmarks: (r.worldLandmarks || []).map(hand => hand.map(p => ({ x: -p.x, y: -p.y, z: p.z }))),
+    handednesses: r.handednesses || [],
+  };
+}
+
+// 같은 손이 두 번 검출된 "유령 손" 정리. numHands를 여유 있게 잡으면 한 손이
+// 겹친 위치에 중복으로 잡히는 프레임이 있는데(특히 회전 인식의 뒤집힌 손),
+// 판정은 감지된 모든 손이 포즈를 만족해야 하므로 유령 손 하나가 인식 전체를
+// 막는다. 두 손의 랜드마크 중심이 손 크기 대비 매우 가까우면 중복으로 보고
+// handedness 점수가 높은 쪽만 남긴다. 실제 두 손은 겹쳐 잡아도 중심이 이만큼
+// 가까워지지 않는다.
+function dedupeDetectedHands(result) {
+  const lms = result.landmarks || [];
+  if (lms.length < 2) return result;
+  const centroid = (hand) => {
+    let sx = 0, sy = 0;
+    for (const p of hand) { sx += p.x; sy += p.y; }
+    return { x: sx / hand.length, y: sy / hand.length };
+  };
+  const spanOf = (hand) => {
+    let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (const p of hand) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return Math.hypot(maxX - minX, maxY - minY) || 0.001;
+  };
+  const scoreOf = (i) => {
+    const h = (result.handednesses || [])[i];
+    return (h && h[0] && h[0].score) || 0;
+  };
+  const centers = lms.map(centroid);
+  const spans = lms.map(spanOf);
+  const dropped = new Set();
+  for (let i = 0; i < lms.length; i++) {
+    if (dropped.has(i)) continue;
+    for (let j = i + 1; j < lms.length; j++) {
+      if (dropped.has(j)) continue;
+      // 문턱 0.2: 유령 손은 진짜 손과 거의 같은 자리에 겹치므로 이 정도면 충분히
+      // 잡힌다. 0.4로 뒀더니 양손하트처럼 두 손이 겹치는 포즈에서 진짜 손을
+      // 중복으로 오판해 지워버렸다 (손이 홀수가 돼 쌍 판정이 무조건 실패).
+      const centerDist = Math.hypot(centers[i].x - centers[j].x, centers[i].y - centers[j].y);
+      if (centerDist < 0.2 * Math.max(spans[i], spans[j])) {
+        dropped.add(scoreOf(i) >= scoreOf(j) ? j : i);
+      }
+    }
+  }
+  if (dropped.size === 0) return result;
+  const keep = (arr) => (arr || []).filter((_, i) => !dropped.has(i));
+  return {
+    landmarks: keep(result.landmarks),
+    worldLandmarks: keep(result.worldLandmarks),
+    handednesses: keep(result.handednesses),
+  };
+}
+
+function loop() {
+  if (!handLandmarker) return;
+  if (currentIdx >= sequence.length) return; // 8장 다 찍음
+
+  if (video.currentTime !== lastVideoTime) {
+    lastVideoTime = video.currentTime;
+    const gestureDef = sequence[currentIdx];
+    // 야호는 회전 인식을 먼저 시도하고, 회전 프레임에서 손을 못 찾으면(아직
+    // 손을 뒤집기 전 등) 일반 인식으로 폴백해 노란 마커 피드백은 유지한다.
+    let result = null;
+    let usedRotation = false;
+    if (gestureDef.id === 'yahoo') {
+      const rotated = detectHandsRotated180();
+      if (rotated.landmarks.length > 0) {
+        result = rotated;
+        usedRotation = true;
+      }
+    }
+    if (!result) result = handLandmarker.detectForVideo(video, performance.now());
+    result = dedupeDetectedHands(result);
+    const hands = result.landmarks || [];
+    const worldHands = result.worldLandmarks || [];
+    // 손등/손바닥 방향 판정에 필요한 왼손/오른손 라벨 추출 (손바닥 포즈에서 사용)
+    const handednesses = (result.handednesses || []).map(h => (h && h[0] && h[0].categoryName) || 'Right');
+    const rawOk = CHECKERS[gestureDef.id](hands, handednesses, worldHands);
+    // 손별 개별 판정 (오버레이 점 색깔용): 예전엔 모든 손을 전체 판정 하나로
+    // 칠해서, 판정에 참여 안 한 손(감지 누락 후 재등장 등)까지 초록으로 보이는
+    // 착시가 있었음. 양손 관계 판정(양손하트)은 짝 단위 결과로 칠해서
+    // 여러 명이 함께할 때 어느 쌍이 안 되고 있는지 보이게 한다.
+    const perHandOk = SPECIAL_CHECKERS[gestureDef.id]
+      ? (lastPairPerHandOk && lastPairPerHandOk.length === hands.length
+          ? [...lastPairPerHandOk]
+          : hands.map(() => rawOk))
+      : hands.map((lm, i) => COMPONENTS[gestureDef.id](lm, handednesses[i], worldHands[i]));
+    // 테스트 모드: 판정 함수가 남긴 내부 값을 0.5초마다 로그로 출력 (문턱 튜닝용)
+    if (DEBUG_POSE && gestureDef.id === 'yahoo' && window.__poseDebug) {
+      window.__poseDebug += ` · 인식경로: ${usedRotation ? '회전(180도)' : '일반'}`;
+    }
+    if (DEBUG_POSE && window.__poseDebug && performance.now() - (window.__poseDebugTs || 0) > 500) {
+      window.__poseDebugTs = performance.now();
+      log(window.__poseDebug);
+      window.__poseDebug = null;
+    }
+    // 촬영 직후 준비 시간에는 기록을 쌓지 않아 다음 동작 판정에 실패 프레임이 섞이지 않게 한다.
+    const ok = !inResetGap && smoothDetection(rawOk, hands.length, gestureDef.id);
+    // 야호의 마커 색은 흔들리는 단일 프레임 판정 대신 최근 프레임의 안정화
+    // 결과를 사용한다. 위치는 원본 랜드마크를 유지하되 초록/노랑 진동을 줄인다.
+    const overlayPerHandOk = gestureDef.id === 'yahoo' && hands.length === 1
+      ? [ok]
+      : perHandOk;
+    drawOverlay(result, overlayPerHandOk);
+
+    if (!inResetGap) {
+      handleDetection(ok, hands.length, gestureDef.minHands);
+    }
+  }
+  requestAnimationFrame(loop);
+}
+
+function drawOverlay(result, perHandOk) {
+  octx.clearRect(0, 0, overlay.width, overlay.height);
+  if (!result.landmarks) return;
+  // 손마다 "그 손이" 동작을 만족하는지에 따라 색을 칠한다 (초록/노랑).
+  // 전체 판정 하나로 모든 손을 칠하면, 심사에 참여하지 않은 손까지 통과한
+  // 것처럼 보이는 착시가 생긴다.
+  result.landmarks.forEach((hand, i) => {
+    octx.fillStyle = perHandOk[i] ? '#5ee08a' : '#ffd54a';
+    for (const pt of hand) {
+      octx.beginPath();
+      octx.arc(pt.x * overlay.width, pt.y * overlay.height, 3, 0, Math.PI * 2);
+      octx.fill();
+    }
+  });
+}
+
+function handleDetection(ok, handCount, minHands) {
+  const countInfo = handCount > 0 ? ` · 감지된 손 ${handCount}개` : ' · 손이 감지되지 않음';
+  if (countdownStartTs !== null) {
+    // 카운트다운 진행 중
+    if (!ok) {
+      // 짧은 랜드마크 누락은 허용하고, 실패가 400ms 이상 이어질 때만 카운트다운을 취소한다.
+      if (detectionFailureStartTs === null) {
+        detectionFailureStartTs = performance.now();
+      }
+      if (performance.now() - detectionFailureStartTs >= FAILURE_GRACE_MS) {
+        countdownStartTs = null;
+        countdownNumEl.textContent = '';
+        resetDetectionStability();
+        subStatusEl.innerHTML = `<span class="hint-wait">자세가 풀렸어요. 모든 사람이 다시 동작을 만들어주세요${countInfo}</span>`;
+        return;
+      }
+    } else {
+      detectionFailureStartTs = null;
+    }
+    const elapsed = performance.now() - countdownStartTs;
+    const remain = Math.ceil((COUNTDOWN_MS - elapsed) / 1000);
+    if (elapsed >= COUNTDOWN_MS) {
+      capturePhoto();
+    } else {
+      countdownNumEl.textContent = String(Math.max(remain, 1));
+      subStatusEl.innerHTML = '<span class="hint-hold">자세 유지!</span>';
+    }
+    return;
+  }
+
+  if (ok) {
+    // 최근 10프레임 중 8프레임 이상 인식되면 촬영 카운트다운 시작
+    countdownStartTs = performance.now();
+    detectionFailureStartTs = null;
+  } else {
+    const needMsg = minHands > 1 ? ` (최소 ${minHands}개 손 필요)` : '';
+    subStatusEl.innerHTML = `<span class="hint-wait">동작을 인식하는 중...${needMsg}${countInfo}</span>`;
+  }
+}
+
+function capturePhoto() {
+  const gestureDef = sequence[currentIdx];
+  const tmp = document.createElement('canvas');
+  tmp.width = video.videoWidth;
+  tmp.height = video.videoHeight;
+  const tctx = tmp.getContext('2d');
+  // 거울모드로 저장 (실제 보이는 대로)
+  tctx.translate(tmp.width, 0);
+  tctx.scale(-1, 1);
+  tctx.drawImage(video, 0, 0, tmp.width, tmp.height);
+  const dataUrl = tmp.toDataURL('image/jpeg', 0.92);
+  capturedPhotos.push({ dataUrl, gestureName: gestureDef.name, round: gestureDef.round });
+  log(`촬영 완료: ${gestureDef.name} (${gestureDef.round}/2) [${capturedPhotos.length}/${sequence.length}]`);
+
+  countdownStartTs = null;
+  resetDetectionStability();
+  countdownNumEl.textContent = '';
+  currentIdx++;
+
+  if (currentIdx >= sequence.length) {
+    subStatusEl.textContent = `${sequence.length}장 촬영 완료! 선택 화면으로 이동합니다`;
+    setTimeout(showSelectView, 800);
+    return;
+  }
+
+  inResetGap = true;
+  subStatusEl.textContent = '손을 한 번 내려주세요';
+  showCurrentGesture();
+  setTimeout(() => { inResetGap = false; }, RESET_GAP_MS);
+}
+
+function showCurrentGesture() {
+  const g = sequence[currentIdx];
+  gestureNameEl.textContent = g.name;
+  progressTextEl.textContent = `${currentIdx + 1} / ${sequence.length}번째 촬영  (${g.name.split(' ')[0]} - ${g.round}/2회차)`;
+  guideCaptionEl.textContent = GUIDE_CAPTION[g.id] || '';
+}
+
+// ---------- 선택 화면 ----------
+let selectedIds = []; // capturedPhotos index 순서대로 저장 (배치 순서)
+let selectedLayout = 'vertical'; // 'vertical' | '2x2'
+
+function showSelectView() {
+  document.getElementById('captureStage').style.display = 'none';
+  document.getElementById('statusBar').style.display = 'none';
+  document.getElementById('selectView').style.display = 'block';
+
+  const grid = document.getElementById('grid8');
+  grid.innerHTML = '';
+  capturedPhotos.forEach((photo, i) => {
+    const div = document.createElement('div');
+    div.className = 'thumb';
+    div.innerHTML = `<img src="${photo.dataUrl}"><span class="badge">${photo.gestureName.split(' ')[0]} ${photo.round}</span><span class="order"></span>`;
+    div.onclick = () => toggleSelect(i, div);
+    grid.appendChild(div);
+  });
+}
+
+function toggleSelect(i, div) {
+  const idx = selectedIds.indexOf(i);
+  if (idx >= 0) {
+    selectedIds.splice(idx, 1);
+    div.classList.remove('selected');
+  } else {
+    if (selectedIds.length >= 4) return;
+    selectedIds.push(i);
+    div.classList.add('selected');
+  }
+  document.querySelectorAll('.thumb').forEach((el, elIdx) => {
+    const orderIdx = selectedIds.indexOf(elIdx);
+    el.querySelector('.order').textContent = orderIdx >= 0 ? (orderIdx + 1) : '';
+  });
+  document.getElementById('selCount').textContent = selectedIds.length;
+  document.getElementById('composeBtn').disabled = selectedIds.length !== 4;
+}
+
+document.getElementById('layoutVertical').onclick = () => setLayout('vertical');
+document.getElementById('layout2x2').onclick = () => setLayout('2x2');
+function setLayout(l) {
+  selectedLayout = l;
+  document.getElementById('layoutVertical').classList.toggle('active', l === 'vertical');
+  document.getElementById('layout2x2').classList.toggle('active', l === '2x2');
+  // 2x2는 AI 프레임 생성 없이 배경색만 고르는 패널을 보여주고, 세로 모드는
+  // 기존 AI 프레임 생성 패널을 보여줌 (둘은 동시에 필요 없음).
+  document.getElementById('frameGenPanel').style.display = l === '2x2' ? 'none' : '';
+  document.getElementById('gridColorPanel').style.display = l === '2x2' ? '' : 'none';
+}
+
+// ---------- AI 프레임 생성 (4cut_demo에서 병합) ----------
+const promptInput = document.getElementById('promptInput');
+const negativePromptInput = document.getElementById('negativePromptInput');
+const titleInput = document.getElementById('titleInput');
+const styleRefInput = document.getElementById('styleRefInput');
+const styleRefThumb = document.getElementById('styleRefThumb');
+const clearStyleRefBtn = document.getElementById('clearStyleRefBtn');
+const styleRefStatus = document.getElementById('styleRefStatus');
+const genFrameBtn = document.getElementById('genFrameBtn');
+const clearFrameBtn = document.getElementById('clearFrameBtn');
+const frameStatus = document.getElementById('frameStatus');
+const framePreview = document.getElementById('framePreview');
+const composeBtn = document.getElementById('composeBtn');
+const finalCanvas = document.getElementById('finalCanvas');
+
+// ---------- 테마 선택 (프리셋 칩 + 자유 입력) ----------
+// 실제 이미지 생성 프롬프트(promptInput)는 그대로 두고, 테마를 고르면 그 안에
+// "어떤 장식 모티프를 그릴지"만 자동으로 채워넣는 방식. 그래서 generateFrame()의
+// 기존 로직(77토큰 제한 대응, 포토리얼 방지 가드 등)은 손댈 필요가 없음.
+//
+// 모티프를 단어 나열("rocket, planet, stars")이 아니라 짧은 서술구
+// ("a small rocket, a ringed planet")로 바꿔서 AI가 각 대상의 형태를 더 구체적으로
+// 이해하도록 함. 다만 SD1.5의 CLIP 인코더는 77토큰에서 그냥 잘리므로(청킹 없음,
+// PROMPT_NOTES.md 참고) 문장을 무한정 길게 쓸 수 없음 — 아래 문구들은 각각
+// generateFrame()이 최종 조립하는 전체 프롬프트(스타일+모티프+"vast bare
+// background" 등 구조 지시) 기준으로 실측(node로 토큰 추정)해서, 핵심 지시가
+// 잘리지 않는 선까지만 구체화한 것. 더 길게 늘리면 뒤쪽의 "vast bare background"
+// 같은 중요 지시가 잘려서 오히려 산만한 결과가 나올 수 있음.
+// 대부분의 테마는 motifs만 있고 style은 비워서 아래 THEME_STYLE_SKELETON(공통
+// soft/minimal 톤)을 그대로 씀. 다만 일부 테마는 그 톤으로 그리면 모티프 자체가
+// 잘 안 보이거나(바다: 파도/조개는 얇은 라인아트+옅은 수채로는 형태가 거의 안
+// 잡힘) 원하는 무드가 다른 경우(하트: 미니멀이 아니라 키치한 하이틴 스티커
+// 느낌을 원함)라서, 그런 테마만 style을 따로 지정해 공통 톤을 덮어씀.
+// negativePromptInput의 원래 기본값 — style/negative를 안 쓰는 테마로 되돌아갈 때 이걸로 복원함.
+// (재수정) "사진처럼 나온다"는 것과 별개로 "그림/일러스트 작품처럼 나온다"는
+// 피드백이 있어서, watercolor/painterly/ink illustration/brush strokes/sketch를
+// 새로 추가함(붓이나 색연필로 그린 듯한 느낌 자체를 막음). 대신 보케(bokeh) 효과는
+// 의도적으로 원하는 것이라 "blur, fuzzy edges"는 빼서 서로 충돌하지 않게 함.
+const DEFAULT_NEGATIVE_PROMPT_TEXT =
+  'animal, character, mascot, repeated motifs, dense ornament, crowded border, clusters, all-over pattern, wallpaper, filled border, oversized motif, storybook illustration, childlike drawing, cartoon, cel shading, thick bold outline, colored pencil texture, crayon texture, pencil shading, hatching lines, watercolor, painterly, ink illustration, brush strokes, sketch, photorealistic, photograph, 3D render, realistic texture, realistic lighting, muddy colors, desaturated, gray haze, stains, smudges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, person, face, crayon stick, art supplies, text, watermark';
+// 우주는 AI 텍스트 프롬프트로는 "실제 은하수 사진"처럼 나오거나(사막·지평선까지
+// 딸려나옴) 노란 별 클립아트로 화면이 꽉 차버리는 등 원하는 "불꽃놀이처럼 은은하게
+// 반짝이는 어두운 배경"과는 거리가 먼 결과가 반복돼서, simple 테마와 같은 이유로 AI를
+// 건너뛰고 canvas로 직접 그림 (generateSpaceFrame 참고).
+// 생일/크리스마스/하트는 "flat vector icon"이라고만 하면 아무리 강조해도 회색
+// 테이블 위에 놓인 진짜 풍선 뭉치/트리 가지+유리 오너먼트/하트 모양 사탕 스톡사진처럼
+// 나왔음(구체적인 사물을 주면 이 모델이 "아이콘"보다 "실사"쪽으로 강하게 쏠리는
+// 경향). 그래서 캔버스로 바꿨다가, negative에 "photorealistic, photograph, stock
+// photo, studio photography, glossy 3D render, depth of field, shadow" 등
+// 실제로 나온 결과에 맞춘 구체적인 항목을 넣고 guidance를 8→11로 올렸더니 AI로도
+// 플랫한 스티커 느낌이 나오는 걸 재확인함(BIRTHDAY_CHRISTMAS_NEGATIVE 참고). 다만
+// 그렇게 사실적 묘사를 강하게 막으니 이번엔 화면을 풍선/눈꽃으로 꽉 채우는 쪽으로
+// 쏠려서, strength를 1→0.8로 낮춰 흰 캔버스(=여백)에 조금 더 앵커링되게 해서
+// 여백도 같이 확보함.
+// 크리스마스는 모티프를 각각 단수(a snowflake 등)로 주면 시드에 따라 "장식이
+// 딱 1개만 나오고 나머지 전체가 텅 빔" 현상이 있었음(실제 생성 테스트로 확인).
+// 생일 모티프의 "a couple of balloons", "scattered confetti"처럼 개수를 복수/분산
+// 표현으로 바꿨더니 스트립 전체에 고르게 흩뿌려지는 빈도가 늘어서 같은 패턴을 적용함.
+// 그래도 완전히 결정적이진 않아서(가끔 여전히 몰림) getGeneratedImageIssue()에
+// "몇 개 구역이 통째로 비어있으면 재시도" 체크를 추가해 이중으로 방어함.
+const BIRTHDAY_CHRISTMAS_NEGATIVE =
+  'photorealistic, photograph, photography, stock photo, studio photography, glossy 3D render, realistic lighting, depth of field, shadow, all-over pattern, wallpaper, dense ornament, crowded border, clusters, repeated motifs, filled border, oversized motif, storybook illustration, childlike drawing, watercolor, painterly, text, watermark';
+const BIRTHDAY_CHRISTMAS_STYLE =
+  'cute kawaii sticker illustration, bold flat colors, clean thick outline, ultra-bright pastel background, plenty of empty space';
+
+const THEME_PRESETS = {
+  birthday: {
+    motifs: 'a small birthday cake, a couple of balloons, scattered confetti, a small gift box',
+    style: BIRTHDAY_CHRISTMAS_STYLE,
+    negative: BIRTHDAY_CHRISTMAS_NEGATIVE,
+    guidance: 11.0,
+    strength: 0.8,
+  },
+  christmas: {
+    motifs: 'a small christmas tree, a couple of ornaments, scattered snowflakes, a small santa hat',
+    style: BIRTHDAY_CHRISTMAS_STYLE,
+    negative: BIRTHDAY_CHRISTMAS_NEGATIVE,
+    guidance: 11.0,
+    strength: 0.8,
+  },
+  heart: {
+    motifs: 'a few glossy pink heart stickers, a small pink gingham checkered patch, a soft glowing heart, scattered heart confetti',
+    style: BIRTHDAY_CHRISTMAS_STYLE,
+    negative: BIRTHDAY_CHRISTMAS_NEGATIVE,
+    guidance: 11.0,
+    strength: 0.8,
+  },
+  // "gentle wave", "seashell"처럼 형태가 가늘고 대비가 약한 대상은 delicate thin
+  // line art + pale watercolor 톤에서 거의 안 보였음. 채도는 낮더라도 면을 확실히
+  // 채우는 flat solid color fills로 바꿔서 파도·모래사장·야자수 실루엣이 남게 함.
+  travel: {
+    motifs: 'a small palm tree, a curling ocean wave, a seashell, a strip of sandy beach',
+    style: 'flat solid color fills, clean bold shapes, ultra-bright white background, plenty of empty space',
+  },
+};
+// "hand-drawn symbols"(손그림)를 빼고 "clean flat vector icon"으로 바꿔서
+// 색연필/크레용으로 칠한 듯한 거친 질감이 덜 나오게 함. "flat 2D"는 그대로 남겨서
+// generateFrame()의 guardedBasePrompt가 이 문구를 중복으로 앞에 또 붙이지 않게 함.
+//
+// (수정) "storybook illustration / childlike" 계열 단어가 동화책 삽화처럼 너무
+// 유치하고 진한 느낌을 만들어서, 포토이즘 벚꽃 프레임처럼 "여백이 넓고 장식은
+// 옅은 수채/라인아트로 아주 조금만 있는" 느낌으로 바꿈. requiredDoodleStyle
+// 가드(generateFrame() 안)도 반드시 이 문구와 동일하게 맞춰야 함 — 서로 다른
+// 키워드를 쓰면 가드가 "이 스타일 문구가 없다"고 판단해서 옛날 문구를 또
+// 앞에 붙여버림.
+//
+// (재수정) 위 문구가 "elegant simple decoration, mostly white and pastel
+// background, professional photobooth aesthetic"까지 붙어서 길어지다 보니, SD1.5
+// CLIP의 77토큰 한계(청킹 없음)에서 뒤쪽에 오는 실제 테마 모티프(로켓/케이크/
+// 트리 등)가 통째로 잘려나가는 문제가 있었음. 같은 톤(soft pale watercolor,
+// minimal)은 유지하되 문구 자체를 줄여서 모티프가 잘릴 여지를 줄임.
+//
+// (3차 수정) "delicate thin line art, soft pale watercolor"가 결과적으로 손그림/
+// 수채화 작품처럼 나온다는 피드백으로, 붓터치·수채 느낌을 완전히 빼고 "플랫
+// 아이콘 + 보케(bokeh) 도트"로 이루어진 그래픽 디자인/편집디자인 톤으로 바꿈.
+const THEME_STYLE_SKELETON =
+  'flat minimal graphic design, solid flat pastel background, simple flat vector icon, no gradients, blurred pastel bokeh dots in corners, high contrast simple shapes, plenty of negative space';
+
+// "심플"은 다른 테마와 달리 무늬(doodle)가 "전혀" 없어야 하는데, AI 인페인팅
+// 모델은 negative prompt를 아무리 강하게 줘도 미세한 선/얼룩 하나 정도는 남기는
+// 경향이 있어(모델 자체의 한계) 프롬프트만으로는 100% 무결 단색을 보장 못함.
+// 그래서 심플은 AI 호출 자체를 건너뛰고 canvas로 흰색/검정색을 직접 채워서
+// 무늬가 물리적으로 존재할 수 없게 만듦 (generateSimpleFrame 참고).
+const SIMPLE_COLORS = {
+  '#ffffff': '흰색',
+  '#000000': '검정',
+  '#fffff0': '아이보리',
+  '#8a8360': '카키',
+  '#971e23': '크림슨레드',
+  '#00003d': '남색',
+};
+
+const themeChipRow = document.getElementById('themeChipRow');
+const simpleColorRow = document.getElementById('simpleColorRow');
+const themeCustomInput = document.getElementById('themeCustomInput');
+const applyThemeBtn = document.getElementById('applyThemeBtn');
+const themeStatus = document.getElementById('themeStatus');
+
+let selectedThemeId = null; // 'simple'이면 genFrameBtn이 AI 대신 단색 생성을 씀
+let simpleColor = '#ffffff';
+// 테마별로 guidance/strength까지 다르게 쓰고 싶어서(생일/크리스마스는 결과가
+// 실사처럼 나오는 문제 때문에 값을 따로 튜닝함) generateFrame()이 참조하는 상태값.
+// applyThemeMotifs()가 테마를 바꿀 때마다 같이 갱신하고, 지정 안 하면 기존
+// 기본값(8.0 / styleRefImg 유무에 따른 값)으로 돌아감.
+let themeGuidance = 8.0;
+let themeStrength = null;
+
+function applyThemeMotifs(motifText, sourceLabel, style = THEME_STYLE_SKELETON, negative = DEFAULT_NEGATIVE_PROMPT_TEXT, guidance = 8.0, strength = null) {
+  themeGuidance = guidance;
+  themeStrength = strength;
+  // "only a few small isolated motifs, plenty of empty space"는 예전엔 여기서
+  // 붙였는데, generateFrame()이 최종 조립 시 이미 거의 같은 뜻의 문구("vast bare
+  // background" 등)를 붙이고 있어서 중복이었음. 모티프 서술을 구체화할 자리를
+  // 만들려고 중복분을 빼고, 실제로 필요한 지시는 generateFrame() 쪽에 맡김.
+  //
+  // 모티프(motifText)를 스타일 문구보다 앞에 둠 — CLIP 77토큰 한계에 걸려 뒷부분이
+  // 잘리더라도, "무엇을 그릴지"가 "어떤 화풍으로 그릴지"보다 더 중요하므로 먼저
+  // 잘리지 않게 앞자리를 줌. "decorated sparsely" 표시는 generateFrame()의 가드가
+  // "이미 테마 스타일이 갖춰진 프롬프트"인지 판단하는 기준으로도 씀. style은
+  // 테마별로 다른 화풍(예: 바다는 solid fill, 하트는 키치한 스티커풍)을 쓰고
+  // 싶을 때만 넘기고, 안 넘기면 공통 THEME_STYLE_SKELETON을 씀(자유 입력 테마용).
+  // negative도 테마가 지정한 게 있으면 그걸로 바꿔치기하고, 없으면 기본값으로
+  // 되돌림 — 안 그러면 하트 테마 고른 뒤 다른 테마로 넘어가도 완화된 negative가
+  // 계속 남아있게 됨.
+  promptInput.value = `${motifText}, decorated sparsely, ${style}`;
+  negativePromptInput.value = negative;
+  themeStatus.textContent = `"${sourceLabel}" 테마가 프롬프트에 반영됐어요. "고급" 항목을 펼치면 직접 다듬을 수도 있어요.`;
+}
+
+themeChipRow.querySelectorAll('.theme-chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    themeChipRow.querySelectorAll('.theme-chip').forEach((c) => c.classList.remove('active'));
+    chip.classList.add('active');
+    themeCustomInput.value = '';
+    const theme = chip.dataset.theme;
+    selectedThemeId = theme;
+    if (theme === 'simple') {
+      simpleColorRow.style.display = 'flex';
+      themeStatus.textContent = '아래에서 프레임 색을 골라주세요 (흰색 또는 검정, AI 없이 바로 채워요).';
+    } else if (theme === 'space') {
+      // 우주(불꽃놀이 반짝임)는 텍스트 프롬프트로는 안정적으로 재현이 안 돼서(실제
+      // 테스트에서 매번 스톡사진 은하수나 화면을 꽉 채우는 클립아트로 나옴), AI 호출
+      // 없이 canvas로 직접 그림 — simple 테마와 같은 이유로 AI를 건너뜀.
+      simpleColorRow.style.display = 'none';
+      themeStatus.textContent = '어두운 밤하늘 + 불꽃놀이 반짝임으로 바로 채워져요 (AI를 안 거쳐서 항상 안정적으로 나와요).';
+    } else {
+      simpleColorRow.style.display = 'none';
+      const preset = THEME_PRESETS[theme];
+      applyThemeMotifs(
+        preset.motifs,
+        chip.textContent.trim(),
+        preset.style || THEME_STYLE_SKELETON,
+        preset.negative || DEFAULT_NEGATIVE_PROMPT_TEXT,
+        preset.guidance ?? 8.0,
+        preset.strength ?? null
+      );
+    }
+  });
+});
+
+simpleColorRow.querySelectorAll('.simple-color-chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    simpleColorRow.querySelectorAll('.simple-color-chip').forEach((c) => c.classList.remove('active'));
+    chip.classList.add('active');
+    simpleColor = chip.dataset.color;
+    themeStatus.textContent = `"${SIMPLE_COLORS[simpleColor]}" 단색 프레임을 만들고 있어요...`;
+    generateSimpleFrame();
+  });
+});
+
+// 자유 입력(한글 포함)을 그대로 프롬프트에 꽂으면 CLIP 텍스트 인코더가 한글을
+// 사실상 이해하지 못해 아무 효과가 없다. 그래서 서버의 /api/theme-keywords에
+// 먼저 보내서 (1) 영어로 번역하고 (2) 그 장면을 나타내는 구체적인 영어 모티프
+// 몇 개로 확장한 결과를 받아온 뒤, 그 결과를 프롬프트에 반영한다.
+async function applyCustomTheme() {
+  const text = themeCustomInput.value.trim();
+  if (!text) {
+    themeStatus.textContent = '원하는 테마를 입력한 뒤 "적용"을 눌러주세요.';
+    return;
+  }
+  themeChipRow.querySelectorAll('.theme-chip').forEach((c) => c.classList.remove('active'));
+  simpleColorRow.style.display = 'none';
+  selectedThemeId = null;
+  applyThemeBtn.disabled = true;
+  themeStatus.textContent = `"${text}"를 영어 모티프로 번역·분석하고 있어요...`;
+  try {
+    const res = await fetch('/api/theme-keywords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.keywords) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    applyThemeMotifs(data.keywords, text);
+    themeStatus.textContent = `"${text}" → "${data.keywords}"로 번역·분석해서 프롬프트에 반영했어요. "고급" 항목을 펼치면 직접 다듬을 수도 있어요.`;
+  } catch (err) {
+    // 백엔드가 없거나 분석 실패 시, 이전처럼 입력한 문구를 그대로 사용해 최소한 동작은 하게 함
+    themeStatus.textContent = `번역·분석 실패(${err.message}), 입력한 문구를 그대로 사용할게요.`;
+    applyThemeMotifs(text, text);
+  } finally {
+    applyThemeBtn.disabled = false;
+  }
+}
+applyThemeBtn.addEventListener('click', applyCustomTheme);
+themeCustomInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); applyCustomTheme(); }
+});
+
+
+let stripFrameImg = null; // 세로 1x4 또는 2x2 전체를 한 번에 생성한 프레임 이미지
+let stripFrameRequestSize = null;
+// true면 stripFrameImg 안에 로고+영문명이 이미 다 그려져 있다는 뜻이라,
+// composeVertical()의 기본 하트+제목+날짜 오버레이를 건너뛰어야 함
+let universityFrameActive = false;
+// 2x2에서 학교 프레임을 적용하면 여기에 학교 정보를 저장해서, composeGrid()가
+// 제목 옆에 로고도 같이 그리게 함. gridColorInput을 사용자가 직접 고치면(학교
+// 색이 아니게 되므로) null로 되돌림 — 아래 input 리스너 참고.
+let gridUniversity = null;
+let styleRefImg = null; // 업로드한 스타일 참고 이미지(선택)
+
+const DEFAULT_STYLE_REF_STATUS = '선택 사항: 색감·분위기를 따라 하고 싶은 참고 이미지를 올리면 그 톤에 맞춰 테두리를 생성해요.';
+// CLIP 토큰 한계 안에서 실사·어두운 색·큰 무늬 금지를 우선 전달하도록 짧게 유지함.
+const DEFAULT_NEGATIVE_BASE = 'photorealistic, photograph, photographic detail, realistic texture, realistic lighting, ' +
+  'colored pencil texture, crayon texture, pencil shading, hatching lines, ' +
+  'material rendering, volumetric shading, 3D render, realistic scene, muddy colors, dull colors, desaturated, gray haze, ' +
+  'blotches, stains, smudges, blur, fuzzy edges, color bleeding, soft boundaries, black filter, dark overlay, underexposed, ' +
+  'all-over pattern, wallpaper, filled border, repeated motifs, dense ornament, crowded border, clusters, oversized motif, ' +
+  'person, character, mascot, animal, face, crayon stick, pencil, marker, art supplies, text, watermark';
+
+styleRefInput.addEventListener('change', async () => {
+  const file = styleRefInput.files && styleRefInput.files[0];
+  if (!file) return;
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  styleRefImg = await loadImage(dataUrl);
+  styleRefThumb.src = dataUrl;
+  styleRefThumb.style.display = 'inline-block';
+  clearStyleRefBtn.style.display = 'inline-block';
+  styleRefStatus.textContent = '참고 이미지 반영됨: 이 이미지의 색감·구도를 어느 정도 따라가며 테두리를 생성해요.';
+});
+
+clearStyleRefBtn.addEventListener('click', () => {
+  styleRefImg = null;
+  styleRefInput.value = '';
+  styleRefThumb.style.display = 'none';
+  clearStyleRefBtn.style.display = 'none';
+  styleRefStatus.textContent = DEFAULT_STYLE_REF_STATUS;
+});
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+// --- 장식용 도형 헬퍼 ---
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawHeart(ctx, cx, cy, size, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  const t = size * 0.3;
+  ctx.moveTo(cx, cy + t);
+  ctx.bezierCurveTo(cx, cy, cx - size / 2, cy, cx - size / 2, cy + t);
+  ctx.bezierCurveTo(cx - size / 2, cy + (size + t) / 2, cx, cy + (size + t) / 2, cx, cy + size);
+  ctx.bezierCurveTo(cx, cy + (size + t) / 2, cx + size / 2, cy + (size + t) / 2, cx + size / 2, cy + t);
+  ctx.bezierCurveTo(cx + size / 2, cy, cx, cy, cx, cy + t);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSparkle(ctx, cx, cy, size, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - size);
+  ctx.quadraticCurveTo(cx + size * 0.15, cy - size * 0.15, cx + size, cy);
+  ctx.quadraticCurveTo(cx + size * 0.15, cy + size * 0.15, cx, cy + size);
+  ctx.quadraticCurveTo(cx - size * 0.15, cy + size * 0.15, cx - size, cy);
+  ctx.quadraticCurveTo(cx - size * 0.15, cy - size * 0.15, cx, cy - size);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// 사진 영역을 피해서 테두리 여백에만 반짝이를 뿌림. color는 2x2의 배경색
+// 선택 기능 때문에 흰색 고정 대신 넘겨받을 수 있게 함(밝은 배경에선 흰
+// 반짝이가 안 보이므로).
+function drawSparkleField(ctx, W, H, pad, color = { r: 255, g: 255, b: 255 }) {
+  const rgba = (a) => `rgba(${color.r}, ${color.g}, ${color.b}, ${a})`;
+  const spots = [
+    [pad * 0.5, pad * 0.55, 7, rgba(1)],
+    [W - pad * 0.5, pad * 0.75, 5, rgba(0.8)],
+    [pad * 0.42, H * 0.32, 6, rgba(0.8)],
+    [W - pad * 0.4, H * 0.24, 8, rgba(1)],
+    [pad * 0.48, H * 0.52, 5, rgba(0.667)],
+    [W - pad * 0.45, H * 0.58, 6, rgba(0.8)],
+    [pad * 0.4, H * 0.74, 7, rgba(1)],
+    [W - pad * 0.42, H * 0.78, 5, rgba(0.667)]
+  ];
+  spots.forEach(([x, y, s, c]) => drawSparkle(ctx, x, y, s, c));
+}
+
+// 촬영 전에도 캔버스 크기를 미리 알아야 AI에게 "이 크기로 만들어줘"라고
+// 요청할 수 있음. 예시 이미지(4컷 세로 스트립 템플릿)에서 한 컷의 비율을
+// 눈대중으로 읽으면 가로:세로 ≈ 5:3(기존 4:3보다 더 납작한 가로형)이라
+// 그 값으로 맞춤. drawPhotoCoverFit이 원본 사진을 이 비율로 크롭해서
+// 넣어주므로 캡처 로직은 안 건드려도 됨
+const PHOTO_ASPECT = 3 / 5; // height / width (≈ 예시 이미지의 한 컷 비율 추정치)
+const OUTPUT_SCALE = 2; // 다운로드용 캔버스는 2배 해상도로 렌더링
+
+// 사진은 칸(chip) 전체를 꽉 채우지 않고, border만큼 안쪽으로 들어가서
+// 확실히 작게 그려짐. 이러면 AI가 만든 프레임의 "빈 사각형" 위치가
+// 우리가 계산한 것과 정확히 일치하지 않아도, 사진이 프레임을 덮어버리는
+// 대신 넉넉한 여백 안에 자연스럽게 들어간 것처럼 보임
+function getStripVerticalSize() {
+  const photoW = 300;
+  const photoH = Math.round(photoW * PHOTO_ASPECT);
+  const border = 60; // 사진 한 장을 감싸는 프레임 여백
+  // 마스크에서 "장식이 못 들어오는" 보호 구역을 사진보다 살짝 크게 잡는 여유값.
+  // 사진은 이 margin까지 포함한 크기로 그려서, 보호 구역 안에 흰 여백이
+  // 남지 않고 꽉 채워지게 함 (장식과는 안 겹치고, 흰 틈도 안 생김)
+  // 긴 1x4 프레임에서는 사진 보호 구역을 칸의 거의 끝까지 넓혀
+  // 사진 사이에 두꺼운 빈 띠가 생기지 않게 함. 실제 장식/구분선은
+  // 바깥쪽 8px + gap 영역에만 남음.
+  const margin = border - 8;
+  const chipW = photoW + border * 2;
+  const pad = 18;
+  const gap = 18;
+  // chipH에 gap을 아예 포함시킴. 그래서 AI 프레임 그림 자체는 chipH 크기로
+  // "여백까지 포함해서" 한 덩어리로 생성/타일링되고, 컷끼리는 이어 붙이듯
+  // 딱 붙여 그려서 그림 사이엔 이음새가 안 생김. 사진(마스크로 고정된 자리)은
+  // 여전히 border만큼 안쪽에서 시작하니, 결과적으로 사진과 사진 사이에만
+  // 여백(장식이 채워진 공간)이 생기고, 프레임 그림 자체는 하나로 이어짐
+  const chipH = photoH + border * 2 + gap;
+  const footerH = 120;
+  const W = chipW + pad * 2;
+  const H = pad + chipH * 4 + footerH;
+  return { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H };
+}
+
+function getStripGridSize() {
+  // 2x2 모드는 가로 3:세로 2 비율의 landscape 컷을 씀. 이전엔 PHOTO_ASPECT(세로
+  // 스트립용, 5:3)를 그대로 써서 셀 하나의 요청 높이가 192px까지 내려갔는데,
+  // Cloudflare Workers AI 인페인팅 모델은 height >= 256을 요구해서 매번
+  // "'/height' must be >= 256" 에러로 실패했음. photoW/H를 키워 여유를 둠.
+  const photoW = 280;
+  const photoH = Math.round(photoW * (2 / 3)); // 3:2 landscape
+  const border = 32;
+  const margin = Math.round(border * 0.35);
+  const chipW = photoW + border * 2;
+  const stripW = 24; // 세로 텍스트를 넣을 오른쪽 여백
+  // 참조 이미지처럼 바깥 여백과 컷 사이 여백을 같은 값으로 균일하게 둠
+  const outerPad = 14;
+  const colGap = 14;
+  const rowGap = 14;
+  // chipH에 rowGap을 포함시켜서 세로 방향(위/아래 컷)은 프레임 그림이
+  // 이어지고, 사진끼리만 여백이 생기게 함 (세로 스트립과 같은 원리)
+  const chipH = photoH + border * 2 + rowGap;
+  const footerH = 90;
+  const W = outerPad * 2 + (chipW + stripW) * 2 + colGap;
+  const H = outerPad * 2 + chipH * 2 + footerH;
+  return { photoW, photoH, border, margin, chipW, chipH, stripW, outerPad, colGap, rowGap, footerH, W, H };
+}
+
+// 요청한 크기(w,h)와 AI가 실제로 돌려준 이미지 크기(iw,ih)가 다를 수 있어서,
+// 비율을 유지하며 목표 칸을 꽉 채우는 "cover" 변환(dx,dy,dw,dh)을 계산.
+// drawFrameCover와 getPhotoRectInChip이 반드시 "같은" 변환을 써야
+// 프레임 그림과 그 위에 얹는 사진 자리가 어긋나지 않음
+function getFrameCoverTransform(img, x, y, w, h) {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  if (!iw || !ih || !w || !h) {
+    return { dx: x, dy: y, dw: w, dh: h };
+  }
+  const ir = iw / ih;
+  const cr = w / h;
+  let dw, dh;
+  if (ir > cr) {
+    dh = h;
+    dw = h * ir;
+  } else {
+    dw = w;
+    dh = w / ir;
+  }
+  return { dx: x + (w - dw) / 2, dy: y + (h - dh) / 2, dw, dh };
+}
+
+function drawFrameCover(ctx, img, x, y, w, h, radius) {
+  const t = getFrameCoverTransform(img, x, y, w, h);
+  ctx.save();
+  // radius=0으로 그리면 칸끼리 맞닿았을 때 모서리가 둥글게 파여 보이는 이음새가
+  // 안 생겨서 4컷이 하나로 자연스럽게 이어짐
+  roundRectPath(ctx, x, y, w, h, radius == null ? 10 : radius);
+  ctx.clip();
+  ctx.fillStyle = '#f7ecf0';
+  ctx.fillRect(x, y, w, h);
+  ctx.drawImage(img, t.dx, t.dy, t.dw, t.dh);
+  ctx.restore();
+}
+
+function buildStripInpaintingAssets(size, outputW, outputH, styleRefImg = null) {
+  const baseCanvas = document.createElement('canvas');
+  baseCanvas.width = outputW;
+  baseCanvas.height = outputH;
+  const bctx = baseCanvas.getContext('2d');
+  bctx.fillStyle = '#fff'; // 인페인팅 요청을 위한 중립 초기 이미지
+  bctx.fillRect(0, 0, outputW, outputH);
+  if (styleRefImg) {
+    const t = getFrameCoverTransform(styleRefImg, 0, 0, outputW, outputH);
+    bctx.drawImage(styleRefImg, t.dx, t.dy, t.dw, t.dh);
+  }
+
+  const maskCanvas = document.createElement('canvas');
+  maskCanvas.width = outputW;
+  maskCanvas.height = outputH;
+  const mctx = maskCanvas.getContext('2d');
+  mctx.fillStyle = '#ffffff';
+  mctx.fillRect(0, 0, outputW, outputH);
+  return { baseCanvas, maskCanvas };
+}
+
+function buildStripPreviewDataUrl(img, size) {
+  const { W, H, chipH, pad, border, margin, photoW, photoH } = size;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  drawFrameCover(ctx, img, 0, 0, W, H, 0);
+  ctx.fillStyle = '#f7ecf0';
+  for (let i = 0; i < 4; i++) {
+    ctx.fillRect(
+      pad + border - margin,
+      pad + i * chipH + border - margin,
+      photoW + margin * 2,
+      photoH + margin * 2
+    );
+  }
+  return canvas.toDataURL('image/png');
+}
+
+function canvasToBase64Png(canvas) {
+  return canvas.toDataURL('image/png').split(',')[1];
+}
+
+function canvasToByteArray(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(async (blob) => {
+      if (!blob) { reject(new Error('마스크 이미지를 만들지 못했습니다.')); return; }
+      const buf = await blob.arrayBuffer();
+      resolve(Array.from(new Uint8Array(buf)));
+    }, 'image/png');
+  });
+}
+
+function getGeneratedImageIssue(img) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 32, 32);
+  ctx.drawImage(img, 0, 0, 32, 32);
+  const pixels = ctx.getImageData(0, 0, 32, 32).data;
+  let brightness = 0;
+  let edgeBrightness = 0;
+  let edgeCount = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    const value = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+    brightness += value;
+    const pixelIndex = i / 4;
+    const x = pixelIndex % 32;
+    const y = Math.floor(pixelIndex / 32);
+    if (x < 6 || x >= 26 || y < 4 || y >= 28) {
+      edgeBrightness += value;
+      edgeCount++;
+    }
+  }
+  const count = 32 * 32;
+  const mean = brightness / count;
+  const edgeMean = edgeBrightness / edgeCount;
+  if (mean < 45 || edgeMean < 55) return '결과가 지나치게 어두움';
+  return '';
+}
+
+// 모델이 유효한 무늬 위에 회색 필터를 씌운 듯 출력하는 경우, 검정 이미지
+// 판정을 통과한 결과에만 밝은 아이보리 screen 보정을 적용한다.
+async function removeDarkCast(img) {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  const sample = document.createElement('canvas');
+  sample.width = 24;
+  sample.height = 24;
+  const sctx = sample.getContext('2d', { willReadFrequently: true });
+  sctx.drawImage(img, 0, 0, 24, 24);
+  const pixels = sctx.getImageData(0, 0, 24, 24).data;
+  let sum = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    sum += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+  }
+  const mean = sum / (24 * 24);
+  const canvas = document.createElement('canvas');
+  canvas.width = iw;
+  canvas.height = ih;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  if (mean < 190) {
+    const strength = Math.min(0.45, Math.max(0, (190 - mean) / (255 - mean)));
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = `rgba(255, 252, 245, ${strength})`;
+    ctx.fillRect(0, 0, iw, ih);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // screen 보정으로 옅어진 색을 다시 맑게 복원한다. 대비를 소폭 올려 작은
+  // 도형의 경계도 얼룩처럼 퍼지지 않고 분명하게 보이도록 함.
+  const enhanced = document.createElement('canvas');
+  enhanced.width = iw;
+  enhanced.height = ih;
+  const ectx = enhanced.getContext('2d');
+  ectx.filter = 'saturate(1.28) contrast(1.06)';
+  ectx.drawImage(canvas, 0, 0);
+  return loadImage(enhanced.toDataURL('image/png'));
+}
+
+// 사진을 목표 사각형 안에 늘리지 않고(비율 유지) 꽉 채워 그림 — 초과분은 크롭
+function drawPhotoCoverFit(ctx, img, dx, dy, dw, dh, radius) {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  const ir = iw / ih;
+  const tr = dw / dh;
+  let sx, sy, sw, sh;
+  if (ir > tr) {
+    sh = ih;
+    sw = ih * tr;
+    sx = (iw - sw) / 2;
+    sy = 0;
+  } else {
+    sw = iw;
+    sh = iw / tr;
+    sx = 0;
+    sy = (ih - sh) / 2;
+  }
+  ctx.save();
+  roundRectPath(ctx, dx, dy, dw, dh, radius ?? 8);
+  ctx.clip();
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+  ctx.restore();
+}
+
+// 사진을 그릴 자리는 마스크로 이미 정확히 박아넣은 좌표(제출한 chipW x chipH
+// 캔버스 기준, border-margin, border-margin, photoW+margin*2, photoH+margin*2
+// = 마스크의 보호 구역과 정확히 같은 크기)이므로 감지는 필요 없음. 사진을
+// 보호 구역 전체(여백 포함) 크기로 그려야 "장식은 안 겹치고, 흰 여백도 안
+// 남는" 상태가 됨. 좌표를 화면에 그릴 땐 반드시 drawFrameCover가 쓴 것과
+// "같은" cover 변환을 통과시켜야 함 — 그래야 AI가 다른 크기의 이미지를
+// 돌려줘도 프레임 그림과 사진 자리가 항상 정확히 겹침
+function getPhotoRectInChip(chipX, chipY, chipW, chipH, border, photoW, photoH, margin) {
+  return {
+    x: chipX + border - margin,
+    y: chipY + border - margin,
+    w: photoW + margin * 2,
+    h: photoH + margin * 2
+  };
+}
+
+function getPhotoRectInStrip(index, size) {
+  const { W, H, chipH, pad, border, margin, photoW, photoH } = size;
+  return getPhotoRectFromFrame(size, W, H,
+    pad + border - margin,
+    pad + index * chipH + border - margin,
+    photoW + margin * 2,
+    photoH + margin * 2
+  );
+}
+
+// 생성 요청 당시 크기(size.W/H 기준으로 계산한 requestW/H)와 AI가 실제로 돌려준
+// 이미지 크기가 다를 수 있어서, "논리 좌표(logicX/Y/W/H, 캔버스 W x H 기준)"를
+// 먼저 요청 해상도로 스케일한 다음, stripFrameImg의 실제 cover 변환을 한 번 더
+// 거쳐 최종 캔버스 좌표로 바꿈.
+function getPhotoRectFromFrame(size, W, H, logicX, logicY, logicW, logicH) {
+  const sourceW = stripFrameRequestSize.width;
+  const sourceH = stripFrameRequestSize.height;
+  const scaleX = sourceW / W;
+  const scaleY = sourceH / H;
+  const boxX = logicX * scaleX;
+  const boxY = logicY * scaleY;
+  const boxW = logicW * scaleX;
+  const boxH = logicH * scaleY;
+  const t = getFrameCoverTransform(stripFrameImg, 0, 0, W, H);
+  const x = t.dx + (boxX / sourceW) * t.dw;
+  const y = t.dy + (boxY / sourceH) * t.dh;
+  const w = (boxW / sourceW) * t.dw;
+  const h = (boxH / sourceH) * t.dh;
+  // 마스크 경계의 블렌딩을 덮기 위해 아주 살짝(2%)만 더 확대
+  const outset = 1.02;
+  return {
+    x: x - w * (outset - 1) / 2,
+    y: y - h * (outset - 1) / 2,
+    w: w * outset,
+    h: h * outset
+  };
+}
+
+function drawFrameRegion(ctx, W, H, x, y, w, h) {
+  const iw = stripFrameImg.naturalWidth || stripFrameImg.width;
+  const ih = stripFrameImg.naturalHeight || stripFrameImg.height;
+  const t = getFrameCoverTransform(stripFrameImg, 0, 0, W, H);
+  const sx = Math.max(0, ((x - t.dx) / t.dw) * iw);
+  const sy = Math.max(0, ((y - t.dy) / t.dh) * ih);
+  const sw = Math.min(iw - sx, (w / t.dw) * iw);
+  const sh = Math.max(1, Math.min(ih - sy, (h / t.dh) * ih));
+  ctx.drawImage(stripFrameImg, sx, sy, sw, sh, x, y, w, h);
+}
+
+// 원래 프레임 그림의 해당 위치를 다시 사용해 컷 사이 여백을 막대로 덮어서,
+// 사진 네 칸이 하나로 뭉개지지 않고 표처럼 분명하게 나뉘어 보이게 함.
+function drawStripSeparator(ctx, centerY, height, W, frameH) {
+  drawFrameRegion(ctx, W, frameH, 0, centerY - height / 2, W, height);
+}
+
+async function generateFrame() {
+  universityFrameActive = false;
+  const basePrompt = promptInput.value.trim();
+  if (!basePrompt) {
+    frameStatus.textContent = '프롬프트를 입력해주세요.';
+    return;
+  }
+  genFrameBtn.disabled = true;
+  framePreview.style.display = 'none';
+  frameStatus.textContent = '1×4 세로 프레임 전체를 준비하고 있어요...';
+
+  // AI 프레임 생성은 세로 1x4 모드에서만 지원함(패널 자체가 2x2에서는 숨겨짐).
+  // 사진 자리 네 개를 하나의 마스크로 고정해 캔버스 전체(W x H)를 한 번만
+  // 생성하고, 그 위 정해진 자리에 사진을 얹음.
+  const size = getStripVerticalSize();
+  const { W, H } = size;
+  // 긴 원본 비율은 유지하되 생성 해상도를 낮춰 Beta 인페인팅 모델의
+  // 검은 출력과 긴 처리 시간을 줄임.
+  const requestW = 448;
+  const requestH = Math.ceil((requestW * H / W) / 8) * 8;
+
+  const { baseCanvas, maskCanvas } = buildStripInpaintingAssets(size, requestW, requestH, styleRefImg);
+  const imageB64 = canvasToBase64Png(baseCanvas);
+  const maskBytes = await canvasToByteArray(maskCanvas);
+
+  // SD1.5의 CLIP 텍스트 인코더는 77토큰에서 그냥 잘림(청킹 없음). 그래서:
+  // (1) 문장을 짧게, (2) 구조적으로 중요한 지시를 앞쪽에, (3) 긍정 프롬프트에
+  // "no X" 형태의 부정문을 넣지 않음(대신 negativePrompt에만 명시)
+  const styleRefSuffix = styleRefImg ? ', matching the reference image colors and composition' : '';
+  const requiredDoodleStyle = 'flat minimal graphic design, solid flat pastel background, simple flat vector icon';
+  // "decorated sparsely"는 applyThemeMotifs()가 테마 프롬프트를 만들 때 항상 붙이는
+  // 표시라, 이 문구가 있으면 이미 (테마별로 다를 수 있는) 스타일까지 다 갖춘
+  // 프롬프트라는 뜻. 예전엔 requiredDoodleStyle의 고정 문구가 있는지로 판단했는데,
+  // 바다/하트처럼 테마마다 다른 스타일 문구를 쓰기 시작하면서 그 방식이 깨져서
+  // (스타일이 다르다고 오판해 매번 requiredDoodleStyle을 또 앞에 붙여버림) 기준을
+  // 바꿈. "고급"에서 직접 쓴 프롬프트(이 표시가 없음)만 여기서 스타일이 보강됨.
+  const guardedBasePrompt = /decorated sparsely/i.test(basePrompt)
+    ? basePrompt
+    : `${requiredDoodleStyle}, ${basePrompt}`;
+  // "vast bare background"/"mostly plain border..." 같은 문구를 예전엔 두세 군데서
+  // 중복으로 반복했는데(스타일 문구 자체에 이미 "plenty of empty space"가 있음),
+  // 그만큼 테마 모티프 쪽 토큰이 뒤로 밀려서 77토큰 한계에 잘려나갔음. 여기서는
+  // "몇 개만, 전체 스트립에 걸쳐"라는 배치 지시 하나만 추가로 남김.
+  const prompt = `${guardedBasePrompt}, only a few tiny isolated accents across the entire strip${styleRefSuffix}`;
+
+  // negativePrompt는 negativePromptInput에서 직접 편집 가능. 비워두면
+  // 안전한 기본값(DEFAULT_NEGATIVE_BASE)으로 되돌아감.
+  const negativeBase = negativePromptInput.value.trim() || DEFAULT_NEGATIVE_BASE;
+  const requiredNoToolNegative = 'crayon stick, crayon object, pencil, marker, drawing tool, art supplies';
+  const guardedToolNegative = /crayon stick|crayon object|drawing tool|art supplies/i.test(negativeBase)
+    ? negativeBase
+    : `${requiredNoToolNegative}, ${negativeBase}`;
+  const requiredNonPhotoNegative = 'photorealistic, photography, photograph, realistic scene, camera image, stock photo, portrait, person, face, body, realistic lighting, 3D render';
+  const guardedNegativeBase = /photorealistic|photography|photograph/i.test(guardedToolNegative)
+    ? guardedToolNegative
+    : `${requiredNonPhotoNegative}, ${guardedToolNegative}`;
+  const negativePrompt = `${guardedNegativeBase}, empty canvas, rectangular openings, grid lines`;
+
+  const seed = Math.floor(Math.random() * 2000000000);
+  // 참고 이미지가 있을 때만 해당 이미지의 색과 구도를 보존함. 참고 이미지가 없으면
+  // themeStrength(테마별 지정값, 없으면 1)를 씀 — 생일/크리스마스는 strength를
+  // 낮춰서(0.8) 흰 캔버스 쪽에 살짝 더 앵커링되게 했더니 "풍선으로 화면을 꽉
+  // 채우는" 문제가 줄어들었음(실제 생성 테스트로 확인).
+  const genStrength = styleRefImg ? 0.55 : (themeStrength ?? 1);
+  try {
+    const maxAttempts = 3;
+    let acceptedFrame = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      frameStatus.textContent = `1×4 세로 프레임 생성 중... (${attempt}/${maxAttempts})`;
+
+      const res = await fetch('/api/generate-frame', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          negativePrompt,
+          width: requestW, height: requestH,
+          image: imageB64, mask: maskBytes,
+          seed: (seed + (attempt - 1) * 7919) % 2147483647,
+          strength: genStrength,
+          // 기본은 8.0(밝기 유지). 생일/크리스마스는 실제 사진처럼 나오는 문제가
+          // 있어서 themeGuidance를 11.0으로 올려 negativePrompt(사실적 묘사 금지)를
+          // 더 강하게 따르도록 튜닝함(실제 생성 테스트로 확인).
+          guidance: themeGuidance
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        const detail = data.detail ? ` (${JSON.stringify(data.detail)})` : '';
+        throw new Error('프레임 생성 실패: ' + (data.error || `HTTP ${res.status}`) + detail);
+      }
+      if (!data.image) {
+        throw new Error('응답에서 이미지 데이터를 찾지 못했습니다.');
+      }
+
+      const mime = data.mime || 'image/jpeg';
+      const dataUrl = `data:${mime};base64,${data.image}`;
+      let rawFrameImg = await loadImage(dataUrl);
+      const imageIssue = getGeneratedImageIssue(rawFrameImg);
+      if (imageIssue) {
+        frameStatus.textContent = `${imageIssue}: 다른 설정으로 다시 생성하고 있어요...`;
+        continue;
+      }
+      acceptedFrame = await removeDarkCast(rawFrameImg);
+      acceptedFrame.dataUrl = acceptedFrame.src;
+      break;
+    }
+    if (!acceptedFrame) {
+      throw new Error('3번 시도했지만 지나치게 어두운 이미지만 반환됐습니다. 잠시 후 다시 시도해주세요.');
+    }
+
+    stripFrameImg = acceptedFrame;
+    stripFrameRequestSize = { width: requestW, height: requestH };
+    framePreview.src = buildStripPreviewDataUrl(stripFrameImg, size);
+    framePreview.style.display = 'block';
+    frameStatus.textContent = '연결된 1×4 세로 프레임 생성 완료! 네 사진 자리를 하나의 긴 디자인이 감싸요.';
+  } catch (err) {
+    // "Failed to fetch"는 서버가 아예 응답하지 않을 때(주소가 없거나, 백엔드가
+    // 안 켜져 있을 때) 브라우저가 던지는 네트워크 레벨 에러. HTTP 에러(4xx/5xx)와
+    // 달리 서버까지 요청이 도달하지도 못한 상태이므로, 이 경우엔 원인을 더
+    // 명확하게 안내한다.
+    if (err instanceof TypeError && /fetch/i.test(err.message)) {
+      frameStatus.textContent =
+        'AI 프레임 생성 서버(/api/generate-frame)에 연결할 수 없습니다. '
+        + '이 기능은 별도의 백엔드(Cloudflare Worker)가 실행 중이어야 동작해요. '
+        + '백엔드 없이도 "기본으로" 버튼을 누르면 기본 디자인으로 계속 진행할 수 있습니다.';
+    } else {
+      frameStatus.textContent = '생성 실패: ' + err.message;
+    }
+  } finally {
+    genFrameBtn.disabled = false;
+  }
+}
+
+function buildSolidFrameDataUrl(w, h, color) {
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w));
+  c.height = Math.max(1, Math.round(h));
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, c.width, c.height);
+  return c.toDataURL('image/png');
+}
+
+// AI를 거치지 않고 canvas만으로 완전한 단색 프레임을 만듦 — 무늬가 생길 여지 자체가
+// 없어서 100% 무늬 없는 결과가 보장됨. (선택한 layout 크기에 맞춰 즉시 생성되므로
+// 네트워크 요청도, 재시도도 필요 없음)
+async function generateSimpleFrame() {
+  universityFrameActive = false;
+  genFrameBtn.disabled = true;
+  framePreview.style.display = 'none';
+  const size = getStripVerticalSize();
+  const dataUrl = buildSolidFrameDataUrl(size.W, size.H, simpleColor);
+  stripFrameImg = await loadImage(dataUrl);
+  stripFrameRequestSize = { width: size.W, height: size.H };
+  framePreview.src = dataUrl;
+  framePreview.style.display = 'block';
+  themeStatus.textContent = `"${SIMPLE_COLORS[simpleColor]}" 단색 프레임 적용 완료! (AI를 안 거쳐서 항상 무늬 없이 나와요)`;
+  frameStatus.textContent = '단색 프레임이 적용됐어요.';
+  genFrameBtn.disabled = false;
+}
+
+function clearFrame() {
+  universityFrameActive = false;
+  stripFrameImg = null;
+  stripFrameRequestSize = null;
+  framePreview.style.display = 'none';
+  frameStatus.textContent = '기본 디자인으로 돌아갔어요.';
+}
+
+// ---------- 우주 프레임 (AI 없이 canvas로 직접 그림) ----------
+// 둘 다 "구체적인 그래픽 스타일"(하트: 하이틴 다이어리 깅엄+스티커, 우주: 어두운
+// 밤하늘 + 불꽃놀이 반짝임)을 원하는데, 텍스트 프롬프트로는 매번 다르게 나오거나
+// (하트) 실제 은하수 사진처럼/별 클립아트로 화면이 꽉 차버리는(우주) 등 원하는
+// 느낌과 거리가 먼 결과가 반복돼서, simple 테마와 같은 방식으로 AI 호출 자체를
+// 건너뛰고 코드로 직접 그려서 항상 같은 느낌을 보장함.
+
+// 사진 네 장이 세로 스트립 높이의 대부분(각 칸의 photoH+margin*2)을 차지하고
+// 남는 "뚫린" 구역은 위쪽 여백 1개 + 사진 사이 이음매 3개(각각 34px 정도로 아주
+// 얇음) + 아래쪽 푸터, 이렇게 5곳뿐임. 처음엔 "캔버스 전체에서 무작위 좌표를
+// 뽑고 사진 자리와 겹치면 다시 뽑기"로 짰는데, 그러면 사진 사이 34px짜리 좁은
+// 틈에는 장식이 거의 안 들어가고(반지름이 그 틈보다 큰 경우가 많아 계속
+// 실패) 상대적으로 넓은 푸터 쪽에만 잔뜩 몰리는 문제가 있었음(실제로 렌더링해서
+// 확인함). 그래서 "뚫린 구역 5곳을 미리 계산해두고 장식들을 그 5곳에 고르게
+// 나눠 배정"하는 방식으로 바꿈 — 이러면 좁은 틈에서는 크기를 그 틈에 맞게
+// 자동으로 줄여서라도 반드시 그 구역 안에 들어가고, 넓은 구역(위/아래)에서는
+// 원래 크기 그대로 나와서 전체적으로 스트립 전체에 고르게 흩뿌려짐.
+function getOpenBands(size) {
+  const { H, pad, chipH, border, margin, photoH } = size;
+  const bands = [];
+  let prevBottom = 0;
+  for (let i = 0; i < 4; i++) {
+    const chipY = pad + i * chipH;
+    const protTop = chipY + border - margin;
+    const protBottom = protTop + photoH + margin * 2;
+    if (protTop > prevBottom) bands.push({ yMin: prevBottom, yMax: protTop });
+    prevBottom = protBottom;
+  }
+  if (H > prevBottom) bands.push({ yMin: prevBottom, yMax: H });
+  return bands;
+}
+
+function scatterAvoidingPhotos(size, count, minSize, maxSize) {
+  const { W } = size;
+  const bands = getOpenBands(size);
+  const positions = [];
+  for (let i = 0; i < count; i++) {
+    const band = bands[i % bands.length];
+    const bandH = Math.max(1, band.yMax - band.yMin);
+    const itemSize = Math.min(minSize + Math.random() * (maxSize - minSize), bandH * 0.9);
+    const y = band.yMin + itemSize / 2 + Math.random() * Math.max(1, bandH - itemSize);
+    const x = 20 + Math.random() * (W - 40);
+    positions.push({ x, y, size: itemSize });
+  }
+  return positions;
+}
+
+// --- 우주 ---
+const SPACE_STAR_COLORS = ['#FFFFFF', '#FFF6D9', '#D9E8FF', '#FFE3F0'];
+
+// 불꽃놀이 느낌: 중심에서 사방으로 뻗는 얇은 선 몇 가닥 + 중앙의 작은 반짝임(sparkle)
+function drawFirework(ctx, cx, cy, size, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, size * 0.05);
+  ctx.globalAlpha = 0.75;
+  const rays = 10;
+  for (let i = 0; i < rays; i++) {
+    const angle = (Math.PI * 2 * i) / rays + Math.random() * 0.2;
+    const len = size * (0.55 + Math.random() * 0.45);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len);
+    ctx.stroke();
+  }
+  ctx.restore();
+  drawSparkle(ctx, cx, cy, size * 0.32, color);
+}
+
+async function generateSpaceFrame() {
+  universityFrameActive = false;
+  genFrameBtn.disabled = true;
+  framePreview.style.display = 'none';
+  const size = getStripVerticalSize();
+  const c = document.createElement('canvas');
+  c.width = size.W;
+  c.height = size.H;
+  const ctx = c.getContext('2d');
+
+  const grad = ctx.createLinearGradient(0, 0, size.W, size.H);
+  grad.addColorStop(0, '#1B1F3B');
+  grad.addColorStop(0.55, '#232A52');
+  grad.addColorStop(1, '#12152C');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size.W, size.H);
+
+  // 자잘하게 반짝이는 별들
+  scatterAvoidingPhotos(size, 70, 1.5, 4).forEach((p) => {
+    const color = SPACE_STAR_COLORS[Math.floor(Math.random() * SPACE_STAR_COLORS.length)];
+    drawSparkle(ctx, p.x, p.y, p.size, color);
+  });
+  // 불꽃놀이처럼 크게 반짝이는 포인트 몇 개
+  scatterAvoidingPhotos(size, 5, 10, 20).forEach((p) => {
+    drawFirework(ctx, p.x, p.y, p.size, '#FFFFFF');
+  });
+
+  const dataUrl = c.toDataURL('image/png');
+  stripFrameImg = await loadImage(dataUrl);
+  stripFrameRequestSize = { width: size.W, height: size.H };
+  framePreview.src = dataUrl;
+  framePreview.style.display = 'block';
+  themeStatus.textContent = '어두운 밤하늘 + 불꽃놀이 반짝임 프레임 적용 완료! (AI를 안 거쳐서 항상 안정적으로 나와요)';
+  frameStatus.textContent = '우주 프레임이 적용됐어요.';
+  genFrameBtn.disabled = false;
+}
+
+genFrameBtn.addEventListener('click', () => {
+  if (selectedThemeId === 'simple') {
+    generateSimpleFrame();
+  } else if (selectedThemeId === 'space') {
+    generateSpaceFrame();
+  } else {
+    generateFrame();
+  }
+});
+clearFrameBtn.addEventListener('click', clearFrame);
+
+// ---------- 대학교 프레임 ----------
+// 실제 학교 로고(교표)는 학교마다 등록된 상표/저작물이라, 제가 임의로 구해서
+// 코드에 박아넣진 않음(학교마다 라이선스 조건이 다 다르고 확인이 안 됨).
+// 대신 "학교 이름/색상/영문명"까지는 자체 데이터로 미리 넣어두고, 실제 로고
+// 이미지는 사용자가 정당하게 구한 파일을 업로드하면 그 학교 키로 저장해서
+// 이후에는 자동으로 재사용함 (localStorage에 저장 — 이 앱은 Claude 아티팩트가
+// 아니라 사용자 컴퓨터에서 직접 돌아가는 일반 웹앱이라 localStorage 사용 가능).
+// 로고를 아직 안 올렸으면 학교색 안에 이니셜만 넣은 자체 제작 배지로 대체함.
+//
+// color는 각 학교 브랜드 가이드에서 흔히 쓰이는 대표색을 최대한 가깝게 넣은
+// 근사치임. 실제 학교 공식 브랜드 컬러 코드를 알고 있다면 아래 값만 바꾸면 됨.
+const UNIVERSITY_PRESETS = [
+  { key: 'snu', aliases: ['서울대', '서울대학교', 'snu', 'seoul national university'], color: '#003876', englishName: 'SEOUL NATIONAL UNIVERSITY', initial: 'SNU' },
+  { key: 'yonsei', aliases: ['연세대', '연세대학교', 'yonsei', 'yonsei university'], color: '#00205b', englishName: 'YONSEI UNIVERSITY', initial: 'Y' },
+  { key: 'korea', aliases: ['고려대', '고려대학교', 'ku', 'korea university'], color: '#8b1e3f', englishName: 'KOREA UNIVERSITY', initial: 'KU' },
+  { key: 'kaist', aliases: ['카이스트', 'kaist'], color: '#0a3161', englishName: 'KAIST', initial: 'K' },
+  { key: 'hanyang', aliases: ['한양대', '한양대학교', 'hanyang', 'hanyang university'], color: '#004a93', englishName: 'HANYANG UNIVERSITY', initial: 'H' },
+  { key: 'ewha', aliases: ['이화여대', '이화여자대학교', 'ewha', 'ewha womans university'], color: '#1f5c3f', englishName: 'EWHA WOMANS UNIVERSITY', initial: 'E' },
+  { key: 'skku', aliases: ['성균관대', '성균관대학교', 'skku', 'sungkyunkwan university'], color: '#002855', englishName: 'SUNGKYUNKWAN UNIVERSITY', initial: 'SKKU' },
+  { key: 'sogang', aliases: ['서강대', '서강대학교', 'sogang', 'sogang university'], color: '#b0212f', englishName: 'SOGANG UNIVERSITY', initial: 'S' },
+  { key: 'cau', aliases: ['중앙대', '중앙대학교', 'cau', 'chung-ang university', 'chungang university'], color: '#0f2b5c', englishName: 'CHUNG-ANG UNIVERSITY', initial: 'CAU' },
+  { key: 'khu', aliases: ['경희대', '경희대학교', 'khu', 'kyung hee university'], color: '#6f1d3c', englishName: 'KYUNG HEE UNIVERSITY', initial: 'KHU' },
+  { key: 'hufs', aliases: ['한국외대', '한국외국어대학교', '외대', 'hufs', 'hankuk university of foreign studies'], color: '#003d7c', englishName: 'HANKUK UNIVERSITY OF FOREIGN STUDIES', initial: 'HUFS' },
+  { key: 'uos', aliases: ['서울시립대', '서울시립대학교', 'uos', 'university of seoul'], color: '#004b93', englishName: 'UNIVERSITY OF SEOUL', initial: 'UOS' },
+  { key: 'konkuk', aliases: ['건국대', '건국대학교', 'konkuk', 'konkuk university'], color: '#006241', englishName: 'KONKUK UNIVERSITY', initial: 'KU' },
+  { key: 'dongguk', aliases: ['동국대', '동국대학교', 'dongguk', 'dongguk university'], color: '#6a1b2e', englishName: 'DONGGUK UNIVERSITY', initial: 'DGU' },
+  { key: 'hongik', aliases: ['홍익대', '홍익대학교', 'hongik', 'hongik university'], color: '#c8102e', englishName: 'HONGIK UNIVERSITY', initial: 'HU' },
+  { key: 'sookmyung', aliases: ['숙명여대', '숙명여자대학교', 'sookmyung', "sookmyung women's university"], color: '#4b1e6d', englishName: "SOOKMYUNG WOMEN'S UNIVERSITY", initial: 'SM' },
+  { key: 'kookmin', aliases: ['국민대', '국민대학교', 'kookmin', 'kookmin university'], color: '#003876', englishName: 'KOOKMIN UNIVERSITY', initial: 'KMU' },
+  { key: 'postech', aliases: ['포항공대', '포스텍', 'postech', 'pohang university of science and technology'], color: '#a6192e', englishName: 'POSTECH', initial: 'P' },
+  { key: 'pusan', aliases: ['부산대', '부산대학교', 'pnu', 'pusan national university'], color: '#003876', englishName: 'PUSAN NATIONAL UNIVERSITY', initial: 'PNU' },
+  { key: 'unist', aliases: ['유니스트', '울산과학기술원', 'unist', 'ulsan national institute of science and technology'], color: '#001c54', englishName: 'UNIST', initial: 'U' },
+  { key: 'dgist', aliases: ['디지스트', '대구경북과학기술원', 'dgist', 'daegu gyeongbuk institute of science and technology'], color: '#0a1a3a', englishName: 'DGIST', initial: 'D' },
+];
+
+function normalizeUnivQuery(str) {
+  return str.toLowerCase().replace(/\s|대학교|대학|학교/g, '');
+}
+
+function findUniversity(query) {
+  const q = normalizeUnivQuery(query);
+  if (!q) return null;
+  // 정확히 일치하는 것을 우선하고, 없으면 부분 일치(입력이 별칭에 포함되거나
+  // 별칭이 입력에 포함되는 경우)로 한 번 더 찾음
+  for (const u of UNIVERSITY_PRESETS) {
+    if (u.aliases.some((a) => normalizeUnivQuery(a) === q)) return u;
+  }
+  for (const u of UNIVERSITY_PRESETS) {
+    if (u.aliases.some((a) => { const na = normalizeUnivQuery(a); return na.includes(q) || q.includes(na); })) return u;
+  }
+  return null;
+}
+
+// 사용자가 업로드한 로고를 학교 key 기준으로 저장. 브라우저에 영구 저장돼서
+// 한 번 올려두면 다음에 같은 학교를 입력할 때 자동으로 다시 쓰임.
+const UNIV_LOGO_STORAGE_KEY = 'aiFourCutUniversityLogos';
+function loadLogoOverrides() {
+  try {
+    return JSON.parse(localStorage.getItem(UNIV_LOGO_STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+function saveLogoOverride(key, dataUrl) {
+  const all = loadLogoOverrides();
+  all[key] = dataUrl;
+  localStorage.setItem(UNIV_LOGO_STORAGE_KEY, JSON.stringify(all));
+}
+
+const universityInput = document.getElementById('universityInput');
+const genUniversityBtn = document.getElementById('genUniversityBtn');
+const universityStatus = document.getElementById('universityStatus');
+const universityLogoInput = document.getElementById('universityLogoInput');
+const universityLogoLabel = document.getElementById('universityLogoLabel');
+
+// 로고 업로드는 "방금 찾은 학교"를 기준으로 저장함. 입력창에 학교 이름이
+// 바뀔 때마다 지금 몇 번 학교용 업로드인지 라벨로 알려줌.
+let pendingLogoUnivKey = null;
+universityInput.addEventListener('input', () => {
+  const u = findUniversity(universityInput.value.trim());
+  pendingLogoUnivKey = u ? u.key : null;
+  universityLogoLabel.textContent = u
+    ? `"${u.englishName}" 로고 업로드 (선택)`
+    : '로고 업로드는 학교 이름을 먼저 입력해야 활성화돼요';
+  universityLogoInput.disabled = !u;
+});
+
+universityLogoInput.addEventListener('change', () => {
+  const file = universityLogoInput.files && universityLogoInput.files[0];
+  if (!file || !pendingLogoUnivKey) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    saveLogoOverride(pendingLogoUnivKey, reader.result);
+    universityStatus.textContent = '로고가 저장됐어요. "학교 프레임 생성"을 눌러 반영해주세요. (이 브라우저에 계속 저장되어 다음에도 자동으로 쓰여요)';
+  };
+  reader.readAsDataURL(file);
+});
+
+// 세로(1x4) 모드: stripFrameImg 전체를 학교색 배경 + 흰 사진칸으로 그리고,
+// 맨 아래 컬러 여백(footer)에 로고(업로드된 게 있으면 그것, 없으면 자체 제작
+// 이니셜 배지) + 영문 학교명을 나란히 배치함. 각 사진칸 모서리에 반복해서
+// 넣던 배지는 참고 이미지(Pickaboo)처럼 맨 아래 한 곳에만 넣도록 정리함.
+async function buildUniversityStripDataUrl(size, univ) {
+  const { W, H, pad, border, margin, chipW, chipH, photoW, photoH, footerH } = size;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = univ.color;
+  ctx.fillRect(0, 0, W, H);
+
+  for (let i = 0; i < 4; i++) {
+    const chipX = pad;
+    const chipY = pad + i * chipH;
+    const slotX = chipX + border - margin;
+    const slotY = chipY + border - margin;
+    const slotW = photoW + margin * 2;
+    const slotH = photoH + margin * 2;
+    ctx.fillStyle = '#ffffff';
+    roundRectPath(ctx, slotX, slotY, slotW, slotH, 4);
+    ctx.fill();
+  }
+
+  // ---- 맨 아래 컬러 여백: 로고 + 영문 학교명 ----
+  // 로고를 찾는 우선순위: (1) logos/{key}.png 로컬 파일(사용자가 직접 구해서
+  // 넣어둔 것, 매번 새로 올릴 필요 없이 자동으로 쓰임) -> (2) 브라우저에
+  // 업로드해서 저장해둔 것 -> (3) 없으면 자체 제작 이니셜 배지
+  const footerY = H - footerH;
+  const footerCenterY = footerY + footerH / 2;
+  let logoSize = Math.min(footerH * 0.62, 64);
+  let fontSize = Math.max(16, Math.round(logoSize * 0.46));
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  const title = univ.englishName;
+  const gap = 10;
+  // HUFS(HANKUK UNIVERSITY OF FOREIGN STUDIES)처럼 영문명이 아주 긴 학교는 위
+  // 크기 그대로 두면 캔버스 폭(W)을 넘어가서 잘릴 수 있어서, 넘치는 만큼 로고·
+  // 글자 크기를 비례해서 같이 줄임(짧은 학교명은 그대로 큼직하게 나옴).
+  const maxTotalW = W - 24;
+  let textWidth = ctx.measureText(title).width;
+  let totalW = logoSize + gap + textWidth;
+  if (totalW > maxTotalW) {
+    const scale = maxTotalW / totalW;
+    logoSize *= scale;
+    fontSize = Math.max(13, Math.round(fontSize * scale));
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    textWidth = ctx.measureText(title).width;
+    totalW = logoSize + gap + textWidth;
+  }
+  const startX = W / 2 - totalW / 2;
+  const logoX = startX;
+  const logoY = footerCenterY - logoSize / 2;
+
+  const logoImg = await resolveUniversityLogoImage(univ);
+  if (logoImg) {
+    ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+  } else {
+    drawUniversityFallbackBadge(ctx, logoX + logoSize / 2, footerCenterY, logoSize / 2, univ);
+  }
+
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(title, logoX + logoSize + gap, footerCenterY + 1);
+
+  return { dataUrl: c.toDataURL('image/png'), usedLogo: !!logoImg };
+}
+
+// 로고를 아직 안 올렸을 때 쓰는 자체 제작 대체 배지(실제 교표 아님 — 학교색
+// 원 안에 이니셜만 넣은 디자인이라 상표 문제 없이 바로 쓸 수 있음)
+// 로고 이미지를 우선순위대로 찾아서 로드된 Image 객체를 반환. 아무것도 없으면
+// null을 반환(호출부에서 대체 배지를 그림).
+// (1) logos/{key}.png|jpg|svg — 서버 폴더에 직접 넣어둔 파일. 파일이 없으면
+//     404가 나는데, 이건 정상적인 상황이라 콘솔 에러 없이 조용히 다음 단계로
+//     넘어가도록 이미지 로드 실패를 그냥 흡수함.
+// (2) 브라우저에 업로드해서 저장해둔 로고(localStorage)
+const LOGO_FILE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp'];
+async function tryLoadLocalLogoFile(key) {
+  for (const ext of LOGO_FILE_EXTENSIONS) {
+    try {
+      return await loadImage(`logos/${key}.${ext}`);
+    } catch {
+      // 이 확장자로는 없음 -> 다음 확장자 시도
+    }
+  }
+  return null;
+}
+async function resolveUniversityLogoImage(univ) {
+  const localLogo = await tryLoadLocalLogoFile(univ.key);
+  if (localLogo) return localLogo;
+
+  const uploaded = loadLogoOverrides()[univ.key];
+  if (uploaded) {
+    try {
+      return await loadImage(uploaded);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function drawUniversityFallbackBadge(ctx, cx, cy, r, univ) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.fillStyle = univ.color;
+  ctx.font = `bold ${Math.max(9, r * 0.75)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(univ.initial, cx, cy + 0.5);
+}
+
+async function generateUniversityFrame() {
+  const query = universityInput.value.trim();
+  if (!query) {
+    universityStatus.textContent = '학교 이름을 입력해주세요. 예: 고려대, 카이스트, 한양대';
+    return;
+  }
+  const univ = findUniversity(query);
+  if (!univ) {
+    universityStatus.textContent = `"${query}"에 해당하는 학교를 찾지 못했어요. 지원 목록에 있는 이름(또는 영문 약칭)으로 다시 입력해주세요.`;
+    return;
+  }
+
+  genUniversityBtn.disabled = true;
+  titleInput.value = univ.englishName;
+
+  if (selectedLayout === '2x2') {
+    // 2x2는 stripFrameImg를 쓰지 않고 별도의 배경색 입력(gridColorInput)을
+    // 그대로 재사용하는 구조라, 학교색 hex만 채워 넣으면 기존 렌더링에 그대로
+    // 반영됨. gridUniversity에 학교 정보를 저장해두면 composeGrid()가 1x4와 같은
+    // 로직(resolveUniversityLogoImage → 로고 또는 이니셜 배지)으로 제목 옆에
+    // 로고까지 그려줌.
+    document.getElementById('gridColorInput').value = univ.color;
+    gridUniversity = univ;
+    universityStatus.textContent = `"${univ.englishName}" 색상과 로고가 2x2 배경에 반영됐어요.`;
+    genUniversityBtn.disabled = false;
+    return;
+  }
+
+  framePreview.style.display = 'none';
+  const size = getStripVerticalSize();
+  const { dataUrl, usedLogo } = await buildUniversityStripDataUrl(size, univ);
+  stripFrameImg = await loadImage(dataUrl);
+  stripFrameRequestSize = { width: size.W, height: size.H };
+  universityFrameActive = true;
+  framePreview.src = dataUrl;
+  framePreview.style.display = 'block';
+  universityStatus.textContent = usedLogo
+    ? `"${univ.englishName}" 프레임 적용 완료! 로고가 반영됐어요.`
+    : `"${univ.englishName}" 프레임 적용 완료! (로고가 없어서 자체 제작 이니셜 배지로 대신했어요. logos/${univ.key}.png 파일을 넣거나 위에서 업로드하면 반영돼요)`;
+  frameStatus.textContent = '대학교 프레임이 적용됐어요.';
+  genUniversityBtn.disabled = false;
+}
+
+genUniversityBtn.addEventListener('click', generateUniversityFrame);
+universityInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); generateUniversityFrame(); }
+});
+// 사용자가 gridColorInput을 직접 고치면 더 이상 학교색이 아닐 수 있으니, 로고를
+// 계속 같이 그리지 않도록 gridUniversity를 해제함(학교 프레임 버튼으로 값을
+// 채울 때는 .value만 바꾸고 여기를 안 거치므로 영향 없음).
+document.getElementById('gridColorInput').addEventListener('input', () => {
+  gridUniversity = null;
+});
+
+// ---------- 4컷 합성 (제스처로 고른 사진 + AI 프레임) ----------
+async function composeFinal() {
+  document.getElementById('selectView').style.display = 'none';
+  document.getElementById('resultView').style.display = 'block';
+
+  const images = await Promise.all(selectedIds.map(i => loadImage(capturedPhotos[i].dataUrl)));
+  if (selectedLayout === '2x2') {
+    await composeGrid(images);
+  } else {
+    composeVertical(images);
+  }
+}
+
+function composeVertical(images) {
+  const { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H } = getStripVerticalSize();
+  const hasFrame = !!stripFrameImg && !!stripFrameRequestSize;
+
+  finalCanvas.width = W * OUTPUT_SCALE;
+  finalCanvas.height = H * OUTPUT_SCALE;
+  const ctx = finalCanvas.getContext('2d');
+  ctx.setTransform(OUTPUT_SCALE, 0, 0, OUTPUT_SCALE, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  // 컷 사이 여백(gap)이 투명하게 남지 않고 항상 흰색으로 채워지도록 먼저 깔아둠
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!hasFrame) {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#ffd6e8');
+    grad.addColorStop(1, '#ff8fab');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    drawSparkleField(ctx, W, H, pad);
+  } else {
+    drawFrameCover(ctx, stripFrameImg, 0, 0, W, H, 0);
+  }
+
+  // 사진 4장은 항상 정확히 같은 위치(칸)에 그림. 프레임은 chipH(여백 포함) 단위로
+  // 서로 딱 붙여 그려서 하나로 이어지고, 그 위에 마스크로 고정된 자리에 맞춰
+  // 사진을 프레임보다 확실히 작게 삽입함 — 결과적으로 사진끼리만 떨어져 보임
+  images.forEach((img, i) => {
+    const chipY = pad + i * chipH;
+    const chipX = pad;
+
+    if (!hasFrame) {
+      // AI 프레임이 없을 때도 사진 칸 표시를 위해 살짝 큰 흰 테두리를 깔아줌
+      ctx.fillStyle = '#fff';
+      roundRectPath(ctx, chipX + border - 6, chipY + border - 6, photoW + 12, photoH + 12, 0);
+      ctx.fill();
+    }
+
+    const r = hasFrame
+      ? getPhotoRectInStrip(i, { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H })
+      : getPhotoRectInChip(chipX, chipY, chipW, chipH, border, photoW, photoH, margin);
+    drawPhotoCoverFit(ctx, img, r.x, r.y, r.w, r.h, 0);
+  });
+
+  if (hasFrame) {
+    // 네 사진 칸이 하나로 이어져 보이지 않도록, 각 칸 사이를 프레임 재질의
+    // 가로 막대로 다시 덮어 표처럼 분명한 4개의 직사각형을 만듦.
+    for (let i = 0; i < 3; i++) {
+      const current = getPhotoRectInStrip(i, { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H });
+      const next = getPhotoRectInStrip(i + 1, { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H });
+      const gapTop = current.y + current.h;
+      const gapBottom = next.y;
+      const separatorH = Math.max(12, gapBottom - gapTop);
+      drawStripSeparator(ctx, (gapTop + gapBottom) / 2, separatorH, W, H);
+    }
+  }
+
+  // 하단 라벨: 하트 + 제목 + 날짜. 대학교 프레임은 이 오버레이 대신 프레임
+  // 이미지 자체에 로고+영문명을 이미 그려뒀으므로 여기서는 건너뜀 (안 그러면
+  // 로고+영문명 위에 하트+제목이 또 겹쳐 그려짐)
+  const footerY = H - footerH;
+  if (!universityFrameActive) {
+    if (!hasFrame) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      roundRectPath(ctx, pad * 0.5, footerY + 10, W - pad, footerH - 26, 16);
+      ctx.fill();
+    }
+
+    ctx.textAlign = 'center';
+    [-30, 0, 30].forEach((dx) => drawHeart(ctx, W / 2 + dx, footerY + 40, 9, hasFrame ? '#ffffff' : '#ff5f96'));
+
+    ctx.save();
+    if (hasFrame) {
+      ctx.shadowColor = 'rgba(0,0,0,0.55)';
+      ctx.shadowBlur = 5;
+    }
+    ctx.fillStyle = hasFrame ? '#ffffff' : '#ff5f96';
+    ctx.font = 'bold 28px sans-serif';
+    const title = titleInput.value.trim() || 'StoryBooth';
+    ctx.fillText(title, W / 2, footerY + 76);
+
+    ctx.fillStyle = hasFrame ? '#ffffff' : '#a97b8c';
+    ctx.font = '14px sans-serif';
+    const dateStr = new Date().toLocaleDateString('ko-KR');
+    ctx.fillText(dateStr, W / 2, footerY + 98);
+    ctx.restore();
+  }
+}
+
+// 2x2 배경 색상 입력을 실제 rgb로 바꿈. 캔버스는 한글 색 이름을 이해하지
+// 못하므로 흔한 한글 색 이름은 사전에서 먼저 찾고, 그 외(영어 이름/hex/rgb())는
+// 캔버스에 실제로 칠해봐서 브라우저가 유효한 CSS 색으로 인식하는지 확인함.
+const KOREAN_COLOR_MAP = {
+  '핑크': '#ff8fab', '분홍': '#ff8fab', '분홍색': '#ff8fab', '핑크색': '#ff8fab',
+  '파랑': '#4a90d9', '파란색': '#4a90d9', '파랑색': '#4a90d9', '블루': '#4a90d9',
+  '하늘색': '#6ec6ff', '하늘': '#6ec6ff', '스카이블루': '#6ec6ff',
+  '노랑': '#ffd54a', '노란색': '#ffd54a', '노랑색': '#ffd54a', '옐로우': '#ffd54a',
+  '초록': '#4caf7d', '초록색': '#4caf7d', '녹색': '#4caf7d', '그린': '#4caf7d',
+  '민트': '#4adbc0', '민트색': '#4adbc0',
+  '보라': '#9b6bcf', '보라색': '#9b6bcf', '자주색': '#9b6bcf', '퍼플': '#9b6bcf', '라벤더': '#b8a4e3',
+  '빨강': '#ff5f5f', '빨간색': '#ff5f5f', '빨강색': '#ff5f5f', '레드': '#ff5f5f',
+  '주황': '#ff9f4a', '주황색': '#ff9f4a', '오렌지': '#ff9f4a',
+  '검정': '#333333', '검은색': '#333333', '검정색': '#333333', '블랙': '#333333',
+  '흰색': '#f5f5f5', '하양': '#f5f5f5', '화이트': '#f5f5f5',
+  '베이지': '#e8d9c0', '갈색': '#a9754f', '브라운': '#a9754f',
+  '남색': '#2b4a8f', '네이비': '#2b4a8f', '회색': '#9a9a9a', '그레이': '#9a9a9a'
+};
+
+function isValidCssColor(value) {
+  const ctx = document.createElement('canvas').getContext('2d');
+  ctx.fillStyle = '#010203';
+  ctx.fillStyle = value;
+  return ctx.fillStyle !== '#010203' || value.toLowerCase() === '#010203';
+}
+
+function cssColorToRgb(value) {
+  const c = document.createElement('canvas');
+  c.width = 1;
+  c.height = 1;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = value;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  return { r, g, b };
+}
+
+const GRID_DEFAULT_RGB = { r: 255, g: 143, b: 171 }; // #ff8fab, 기존 기본 핑크
+
+function resolveGridColorRgb(rawInput) {
+  const input = (rawInput || '').trim();
+  if (!input) return GRID_DEFAULT_RGB;
+  const key = input.replace(/\s+/g, '');
+  const probe = KOREAN_COLOR_MAP[key] || input;
+  if (!isValidCssColor(probe)) return GRID_DEFAULT_RGB;
+  return cssColorToRgb(probe);
+}
+
+function mixRgb(rgb, target, amt) {
+  return {
+    r: rgb.r + (target.r - rgb.r) * amt,
+    g: rgb.g + (target.g - rgb.g) * amt,
+    b: rgb.b + (target.b - rgb.b) * amt
+  };
+}
+
+function rgbToCss({ r, g, b }) {
+  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+}
+
+// 2x2는 AI 프레임 생성 기능 없이 항상 깔끔한 기본 디자인(그라데이션 + 반짝이 +
+// 흰 사진 카드)만 사용함. 배경색은 gridColorInput에 적은 값(한글/영어/hex)을
+// 따라가고, 안 적으면 기존 기본 핑크로 나감. gridUniversity가 있으면(학교 프레임
+// 버튼으로 색을 채운 경우) 1x4와 같은 로직(resolveUniversityLogoImage)으로 제목
+// 옆에 로고도 그림 — 로고 로드가 비동기라 이 함수도 async로 바꿈.
+async function composeGrid(images) {
+  const size = getStripGridSize();
+  const { photoW, photoH, border, margin, chipW, chipH, stripW, outerPad, colGap, footerH, W, H } = size;
+
+  finalCanvas.width = W * OUTPUT_SCALE;
+  finalCanvas.height = H * OUTPUT_SCALE;
+  const ctx = finalCanvas.getContext('2d');
+  ctx.setTransform(OUTPUT_SCALE, 0, 0, OUTPUT_SCALE, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  const baseRgb = resolveGridColorRgb(document.getElementById('gridColorInput').value);
+  const lightRgb = mixRgb(baseRgb, { r: 255, g: 255, b: 255 }, 0.55);
+  const darkRgb = mixRgb(baseRgb, { r: 0, g: 0, b: 0 }, 0.12);
+  // 밝은 배경(노랑/흰색 등)에서는 흰 글씨/반짝이가 안 보이므로 배경 밝기에 따라
+  // 글씨·반짝이 색을 자동으로 진하게/밝게 바꿈.
+  const isLight = (0.299 * baseRgb.r + 0.587 * baseRgb.g + 0.114 * baseRgb.b) > 175;
+  const inkRgb = isLight ? { r: 60, g: 45, b: 50 } : { r: 255, g: 255, b: 255 };
+  const inkCss = rgbToCss(inkRgb);
+
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, rgbToCss(lightRgb));
+  grad.addColorStop(1, rgbToCss(darkRgb));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  drawSparkleField(ctx, W, H, outerPad, inkRgb);
+
+  images.forEach((img, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x = outerPad + col * (chipW + stripW + colGap);
+    const y = outerPad + row * chipH;
+
+    ctx.fillStyle = '#fff';
+    roundRectPath(ctx, x + border - 6, y + border - 6, photoW + 12, photoH + 12, 0);
+    ctx.fill();
+
+    const r = getPhotoRectInChip(x, y, chipW, chipH, border, photoW, photoH, margin);
+    drawPhotoCoverFit(ctx, img, r.x, r.y, r.w, r.h, 0);
+
+    // 오른쪽 세로 텍스트 (번호 + 장식 문구)
+    ctx.save();
+    ctx.translate(x + chipW + stripW / 2, y + chipH / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.fillStyle = inkCss;
+    ctx.textAlign = 'center';
+    ctx.font = '11px sans-serif';
+    const num = String(Math.floor(Math.random() * 90 + 10));
+    ctx.fillText(`${num}   ▾   TAKE YOUR MEMORY`, 0, 4);
+    ctx.restore();
+  });
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 20px sans-serif';
+  const title = (titleInput.value.trim() || 'StoryBooth').toUpperCase();
+  const footerCenterY = H - footerH / 2;
+
+  if (gridUniversity) {
+    // 1x4의 buildUniversityStripDataUrl과 같은 배치: 로고 + 영문명을 한 덩어리로
+    // 보고 그 전체 폭을 가운데 정렬한 뒤, 로고는 왼쪽에 그리고 글자는 로고 오른쪽에
+    // 왼쪽 정렬로 이어 붙임.
+    const logoSize = Math.min(footerH * 0.6, 56);
+    const textWidth = ctx.measureText(title).width;
+    const gap = 10;
+    const totalW = logoSize + gap + textWidth;
+    const logoX = W / 2 - totalW / 2;
+
+    const logoImg = await resolveUniversityLogoImage(gridUniversity);
+    if (logoImg) {
+      ctx.drawImage(logoImg, logoX, footerCenterY - logoSize / 2, logoSize, logoSize);
+    } else {
+      drawUniversityFallbackBadge(ctx, logoX + logoSize / 2, footerCenterY, logoSize / 2, gridUniversity);
+    }
+
+    ctx.fillStyle = inkCss;
+    ctx.textAlign = 'left';
+    ctx.fillText(title, logoX + logoSize + gap, footerCenterY + 1);
+  } else {
+    ctx.fillStyle = inkCss;
+    ctx.fillText(title, W / 2, footerCenterY);
+  }
+}
+
+composeBtn.addEventListener('click', composeFinal);
+
+document.getElementById('downloadBtn').onclick = () => {
+  const a = document.createElement('a');
+  a.download = `ai_four_cut_${Date.now()}.png`;
+  a.href = finalCanvas.toDataURL('image/png');
+  a.click();
+};
+
+document.getElementById('restartBtn').onclick = () => location.reload();
+
+init();
+</script>
+</body>
+</html>

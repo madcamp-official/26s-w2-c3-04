@@ -232,7 +232,7 @@
     </div>
   </div>
 
-  <div class="option-card">
+  <div class="option-card" id="frameGenPanel">
     <h2>✨ AI 프레임 생성 (Cloudflare Workers AI)</h2>
     <div class="row">
       <textarea id="promptInput" placeholder="원하는 색과 분위기를 적어주세요. 예: 연한 라벤더와 하늘색, 밝고 포근한 느낌">flat 2D storybook illustration, childlike hand-drawn symbols with solid color fills, ultra-bright high-key pure white-ivory background, clean high-chroma palette, at least ninety percent bare and undecorated, dry wax-pastel texture contained inside each shape, a few small distinct stars and hearts, crisp sharply defined boundaries, plenty of empty space, saturated red, yellow, green, sky blue, pink and orange</textarea>
@@ -248,14 +248,21 @@
     </div>
     <div class="option-status" id="styleRefStatus">선택 사항: 색감·분위기를 따라 하고 싶은 참고 이미지를 올리면 그 톤에 맞춰 테두리를 생성해요.</div>
     <div class="row">
-      <input type="text" id="titleInput" placeholder="제목 텍스트" value="StoryBooth" />
+      <input type="text" id="titleInput" placeholder="제목 텍스트" value="StoryBooth" autocomplete="off" />
     </div>
     <div class="row">
       <button id="genFrameBtn" style="flex:1">프레임 생성</button>
       <button class="btn-secondary" id="clearFrameBtn">기본으로</button>
     </div>
-    <div class="option-status" id="frameStatus">세로 모드에서는 사진 자리 4개가 뚫린 긴 1×4 프레임을, 2x2 모드에서는 칸마다 다른 프레임 4개를 생성해요.</div>
+    <div class="option-status" id="frameStatus">사진 자리 4개가 뚫린 긴 1×4 프레임을 하나로 이어서 생성해요.</div>
     <img class="option-preview" id="framePreview" alt="생성된 프레임 미리보기" />
+  </div>
+  <div class="option-card" id="gridColorPanel" style="display:none;">
+    <h2>🎨 2x2 배경 색상</h2>
+    <div class="row">
+      <input type="text" id="gridColorInput" placeholder="예: 핑크, 하늘색, 노랑, blue, #3498db" />
+    </div>
+    <div class="option-status">AI 프레임 없이 깔끔한 배경색만 적용돼요. 한글로 적어도 되고, 비워두면 기본 핑크로 나가요.</div>
   </div>
 
   <div style="text-align:center;">
@@ -758,6 +765,10 @@ function setLayout(l) {
   selectedLayout = l;
   document.getElementById('layoutVertical').classList.toggle('active', l === 'vertical');
   document.getElementById('layout2x2').classList.toggle('active', l === '2x2');
+  // 2x2는 AI 프레임 생성 없이 배경색만 고르는 패널을 보여주고, 세로 모드는
+  // 기존 AI 프레임 생성 패널을 보여줌 (둘은 동시에 필요 없음).
+  document.getElementById('frameGenPanel').style.display = l === '2x2' ? 'none' : '';
+  document.getElementById('gridColorPanel').style.display = l === '2x2' ? '' : 'none';
 }
 
 // ---------- AI 프레임 생성 (4cut_demo에서 병합) ----------
@@ -775,8 +786,7 @@ const framePreview = document.getElementById('framePreview');
 const composeBtn = document.getElementById('composeBtn');
 const finalCanvas = document.getElementById('finalCanvas');
 
-let frameImgs = []; // AI로 각각 인페인팅한 4개의 프레임 셀 이미지 (2x2 모드)
-let stripFrameImg = null; // 세로 1x4 전체를 한 번에 생성한 연속 프레임
+let stripFrameImg = null; // 세로 1x4 또는 2x2 전체를 한 번에 생성한 프레임 이미지
 let stripFrameRequestSize = null;
 let styleRefImg = null; // 업로드한 스타일 참고 이미지(선택)
 
@@ -862,17 +872,20 @@ function drawSparkle(ctx, cx, cy, size, color) {
   ctx.restore();
 }
 
-// 사진 영역을 피해서 테두리 여백에만 반짝이를 뿌림
-function drawSparkleField(ctx, W, H, pad) {
+// 사진 영역을 피해서 테두리 여백에만 반짝이를 뿌림. color는 2x2의 배경색
+// 선택 기능 때문에 흰색 고정 대신 넘겨받을 수 있게 함(밝은 배경에선 흰
+// 반짝이가 안 보이므로).
+function drawSparkleField(ctx, W, H, pad, color = { r: 255, g: 255, b: 255 }) {
+  const rgba = (a) => `rgba(${color.r}, ${color.g}, ${color.b}, ${a})`;
   const spots = [
-    [pad * 0.5, pad * 0.55, 7, '#ffffff'],
-    [W - pad * 0.5, pad * 0.75, 5, '#ffffffcc'],
-    [pad * 0.42, H * 0.32, 6, '#ffffffcc'],
-    [W - pad * 0.4, H * 0.24, 8, '#ffffff'],
-    [pad * 0.48, H * 0.52, 5, '#ffffffaa'],
-    [W - pad * 0.45, H * 0.58, 6, '#ffffffcc'],
-    [pad * 0.4, H * 0.74, 7, '#ffffff'],
-    [W - pad * 0.42, H * 0.78, 5, '#ffffffaa']
+    [pad * 0.5, pad * 0.55, 7, rgba(1)],
+    [W - pad * 0.5, pad * 0.75, 5, rgba(0.8)],
+    [pad * 0.42, H * 0.32, 6, rgba(0.8)],
+    [W - pad * 0.4, H * 0.24, 8, rgba(1)],
+    [pad * 0.48, H * 0.52, 5, rgba(0.667)],
+    [W - pad * 0.45, H * 0.58, 6, rgba(0.8)],
+    [pad * 0.4, H * 0.74, 7, rgba(1)],
+    [W - pad * 0.42, H * 0.78, 5, rgba(0.667)]
   ];
   spots.forEach(([x, y, s, c]) => drawSparkle(ctx, x, y, s, c));
 }
@@ -916,8 +929,12 @@ function getStripVerticalSize() {
 }
 
 function getStripGridSize() {
-  const photoW = 180;
-  const photoH = Math.round(photoW * PHOTO_ASPECT);
+  // 2x2 모드는 가로 3:세로 2 비율의 landscape 컷을 씀. 이전엔 PHOTO_ASPECT(세로
+  // 스트립용, 5:3)를 그대로 써서 셀 하나의 요청 높이가 192px까지 내려갔는데,
+  // Cloudflare Workers AI 인페인팅 모델은 height >= 256을 요구해서 매번
+  // "'/height' must be >= 256" 에러로 실패했음. photoW/H를 키워 여유를 둠.
+  const photoW = 280;
+  const photoH = Math.round(photoW * (2 / 3)); // 3:2 landscape
   const border = 32;
   const margin = Math.round(border * 0.35);
   const chipW = photoW + border * 2;
@@ -969,142 +986,6 @@ function drawFrameCover(ctx, img, x, y, w, h, radius) {
   ctx.fillRect(x, y, w, h);
   ctx.drawImage(img, t.dx, t.dy, t.dw, t.dh);
   ctx.restore();
-}
-
-function colorDistanceSq(a, b) {
-  const dr = a[0] - b[0];
-  const dg = a[1] - b[1];
-  const db = a[2] - b[2];
-  return dr * dr + dg * dg + db * db;
-}
-
-function getGeneratedContentBounds(img) {
-  const iw = img.naturalWidth || img.width;
-  const ih = img.naturalHeight || img.height;
-  const c = document.createElement('canvas');
-  c.width = iw;
-  c.height = ih;
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0);
-  const data = ctx.getImageData(0, 0, iw, ih).data;
-  const corners = [
-    [0, 0],
-    [iw - 1, 0],
-    [0, ih - 1],
-    [iw - 1, ih - 1]
-  ];
-  const bg = corners.reduce((acc, [x, y]) => {
-    const p = (y * iw + x) * 4;
-    acc[0] += data[p];
-    acc[1] += data[p + 1];
-    acc[2] += data[p + 2];
-    return acc;
-  }, [0, 0, 0]).map(v => v / corners.length);
-
-  const thresholdSq = 30 * 30;
-  let minX = iw, minY = ih, maxX = -1, maxY = -1;
-  for (let y = 0; y < ih; y++) {
-    for (let x = 0; x < iw; x++) {
-      const p = (y * iw + x) * 4;
-      const alpha = data[p + 3];
-      if (alpha < 16) continue;
-      if (colorDistanceSq([data[p], data[p + 1], data[p + 2]], bg) <= thresholdSq) continue;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-    }
-  }
-
-  if (maxX < minX || maxY < minY) {
-    return { x: 0, y: 0, w: iw, h: ih, trimmed: false };
-  }
-
-  const pad = Math.round(Math.min(iw, ih) * 0.02);
-  minX = Math.max(0, minX - pad);
-  minY = Math.max(0, minY - pad);
-  maxX = Math.min(iw - 1, maxX + pad);
-  maxY = Math.min(ih - 1, maxY + pad);
-
-  const bw = maxX - minX + 1;
-  const bh = maxY - minY + 1;
-  const trimsMeaningfully = bw < iw * 0.96 || bh < ih * 0.96;
-  const keepsEnoughImage = bw * bh > iw * ih * 0.35;
-  if (!trimsMeaningfully || !keepsEnoughImage) {
-    return { x: 0, y: 0, w: iw, h: ih, trimmed: false };
-  }
-  return { x: minX, y: minY, w: bw, h: bh, trimmed: true };
-}
-
-async function normalizeGeneratedFrameImage(img, chipW, chipH) {
-  const bounds = getGeneratedContentBounds(img);
-  const c = document.createElement('canvas');
-  c.width = chipW;
-  c.height = chipH;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#f7ecf0';
-  ctx.fillRect(0, 0, chipW, chipH);
-
-  const sourceRatio = bounds.w / bounds.h;
-  const targetRatio = chipW / chipH;
-  let sx = bounds.x, sy = bounds.y, sw = bounds.w, sh = bounds.h;
-  if (sourceRatio > targetRatio) {
-    sw = sh * targetRatio;
-    sx = bounds.x + (bounds.w - sw) / 2;
-  } else {
-    sh = sw / targetRatio;
-    sy = bounds.y + (bounds.h - sh) / 2;
-  }
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, chipW, chipH);
-
-  const normalized = await loadImage(c.toDataURL('image/png'));
-  normalized.wasTrimmed = bounds.trimmed;
-  normalized.normalizedDataUrl = c.toDataURL('image/png');
-  return normalized;
-}
-
-// 인페인팅용 "베이스 이미지 + 마스크"를 코드로 직접 그림.
-// 마스크는 흰색 = AI가 다시 그려도 되는 영역(테두리), 검은색 = 절대 건드리지
-// 말아야 할 영역(사진이 들어갈 자리)으로 약속되어 있음. 사진 자리는 border만큼
-// 안쪽으로 들어간, 우리가 이미 알고 있는 정확한 좌표(photoW x photoH)로 박아
-// 넣기 때문에 "빈 구역을 나중에 감지"할 필요 자체가 없어짐 — 위치가 100% 코드로 고정됨
-function buildInpaintingAssets(chipW, chipH, border, photoW, photoH, margin, outputW = chipW, outputH = chipH, styleRefImg = null) {
-  const scaleX = outputW / chipW;
-  const scaleY = outputH / chipH;
-  const baseCanvas = document.createElement('canvas');
-  baseCanvas.width = outputW;
-  baseCanvas.height = outputH;
-  const bctx = baseCanvas.getContext('2d');
-  bctx.fillStyle = '#fff'; // 낮춘 strength에서 밝은 바탕색을 결과에 남기기 위한 베이스
-  bctx.fillRect(0, 0, outputW, outputH);
-  // 참고 이미지가 있으면 베이스 이미지 자체를 그 사진으로 채움. 인페인팅에서
-  // strength<1이면 흰 마스크(테두리) 영역이 이 베이스 픽셀에서 얼마나
-  // 벗어날지를 조절하므로, 여기 깔아둔 색/구도가 결과에 은은하게 남게 됨
-  // (검은 마스크=사진 자리는 strength와 무관하게 항상 그대로 보존됨)
-  if (styleRefImg) {
-    const t = getFrameCoverTransform(styleRefImg, 0, 0, outputW, outputH);
-    bctx.drawImage(styleRefImg, t.dx, t.dy, t.dw, t.dh);
-  }
-
-  // 마스크의 "건드리지 마" 영역(검정)을 실제 사진 크기보다 margin만큼 더 크게
-  // 잡음. 장식용 스크롤/덩굴 무늬가 물리적으로 절대 들어올 수 없는 빈 여백
-  // 링을 마스크 자체로 확보함. 사진도 이 확장된 크기 그대로 그릴 것이므로
-  // (getPhotoRectInChip 참고) 여백이 "흰 틈"으로 남지 않고 사진이 꽉 채움
-  const maskCanvas = document.createElement('canvas');
-  maskCanvas.width = outputW;
-  maskCanvas.height = outputH;
-  const mctx = maskCanvas.getContext('2d');
-  mctx.fillStyle = '#ffffff';
-  mctx.fillRect(0, 0, outputW, outputH);
-  mctx.fillStyle = '#000000';
-  mctx.fillRect(
-    Math.round((border - margin) * scaleX),
-    Math.round((border - margin) * scaleY),
-    Math.round((photoW + margin * 2) * scaleX),
-    Math.round((photoH + margin * 2) * scaleY)
-  );
-
-  return { baseCanvas, maskCanvas };
 }
 
 function buildStripInpaintingAssets(size, outputW, outputH, styleRefImg = null) {
@@ -1263,42 +1144,44 @@ function drawPhotoCoverFit(ctx, img, dx, dy, dw, dh, radius) {
 // 남는" 상태가 됨. 좌표를 화면에 그릴 땐 반드시 drawFrameCover가 쓴 것과
 // "같은" cover 변환을 통과시켜야 함 — 그래야 AI가 다른 크기의 이미지를
 // 돌려줘도 프레임 그림과 사진 자리가 항상 정확히 겹침
-function getPhotoRectInChip(chipX, chipY, chipW, chipH, border, photoW, photoH, margin, activeFrame) {
-  const boxLeft = border - margin;
-  const boxTop = border - margin;
-  const boxW0 = photoW + margin * 2;
-  const boxH0 = photoH + margin * 2;
-  if (activeFrame) {
-    const t = getFrameCoverTransform(activeFrame, chipX, chipY, chipW, chipH);
-    const boxX = t.dx + (boxLeft / chipW) * t.dw;
-    const boxY = t.dy + (boxTop / chipH) * t.dh;
-    const boxW = (boxW0 / chipW) * t.dw;
-    const boxH = (boxH0 / chipH) * t.dh;
-    // 마스크 경계의 블렌딩을 덮기 위해 아주 살짝(2%)만 더 확대
-    const outset = 1.02;
-    const cx = boxX + boxW / 2, cy = boxY + boxH / 2;
-    const w = boxW * outset, h = boxH * outset;
-    return { x: cx - w / 2, y: cy - h / 2, w, h };
-  }
-  return { x: chipX + boxLeft, y: chipY + boxTop, w: boxW0, h: boxH0 };
+function getPhotoRectInChip(chipX, chipY, chipW, chipH, border, photoW, photoH, margin) {
+  return {
+    x: chipX + border - margin,
+    y: chipY + border - margin,
+    w: photoW + margin * 2,
+    h: photoH + margin * 2
+  };
 }
 
 function getPhotoRectInStrip(index, size) {
-  const { W, H, footerH, chipH, pad, border, margin, photoW, photoH } = size;
-  const frameH = H;
+  const { W, H, chipH, pad, border, margin, photoW, photoH } = size;
+  return getPhotoRectFromFrame(size, W, H,
+    pad + border - margin,
+    pad + index * chipH + border - margin,
+    photoW + margin * 2,
+    photoH + margin * 2
+  );
+}
+
+// 생성 요청 당시 크기(size.W/H 기준으로 계산한 requestW/H)와 AI가 실제로 돌려준
+// 이미지 크기가 다를 수 있어서, "논리 좌표(logicX/Y/W/H, 캔버스 W x H 기준)"를
+// 먼저 요청 해상도로 스케일한 다음, stripFrameImg의 실제 cover 변환을 한 번 더
+// 거쳐 최종 캔버스 좌표로 바꿈.
+function getPhotoRectFromFrame(size, W, H, logicX, logicY, logicW, logicH) {
   const sourceW = stripFrameRequestSize.width;
   const sourceH = stripFrameRequestSize.height;
   const scaleX = sourceW / W;
-  const scaleY = sourceH / frameH;
-  const boxX = (pad + border - margin) * scaleX;
-  const boxY = (pad + index * chipH + border - margin) * scaleY;
-  const boxW = (photoW + margin * 2) * scaleX;
-  const boxH = (photoH + margin * 2) * scaleY;
-  const t = getFrameCoverTransform(stripFrameImg, 0, 0, W, frameH);
+  const scaleY = sourceH / H;
+  const boxX = logicX * scaleX;
+  const boxY = logicY * scaleY;
+  const boxW = logicW * scaleX;
+  const boxH = logicH * scaleY;
+  const t = getFrameCoverTransform(stripFrameImg, 0, 0, W, H);
   const x = t.dx + (boxX / sourceW) * t.dw;
   const y = t.dy + (boxY / sourceH) * t.dh;
   const w = (boxW / sourceW) * t.dw;
   const h = (boxH / sourceH) * t.dh;
+  // 마스크 경계의 블렌딩을 덮기 위해 아주 살짝(2%)만 더 확대
   const outset = 1.02;
   return {
     x: x - w * (outset - 1) / 2,
@@ -1308,18 +1191,21 @@ function getPhotoRectInStrip(index, size) {
   };
 }
 
-function drawStripSeparator(ctx, centerY, height, W, frameH) {
+function drawFrameRegion(ctx, W, H, x, y, w, h) {
   const iw = stripFrameImg.naturalWidth || stripFrameImg.width;
   const ih = stripFrameImg.naturalHeight || stripFrameImg.height;
-  const t = getFrameCoverTransform(stripFrameImg, 0, 0, W, frameH);
-  const sx = Math.max(0, ((0 - t.dx) / t.dw) * iw);
-  const sy = Math.max(0, ((centerY - height / 2 - t.dy) / t.dh) * ih);
-  const sw = Math.min(iw - sx, (W / t.dw) * iw);
-  const sh = Math.max(1, Math.min(ih - sy, (height / t.dh) * ih));
-  const y = centerY - height / 2;
+  const t = getFrameCoverTransform(stripFrameImg, 0, 0, W, H);
+  const sx = Math.max(0, ((x - t.dx) / t.dw) * iw);
+  const sy = Math.max(0, ((y - t.dy) / t.dh) * ih);
+  const sw = Math.min(iw - sx, (w / t.dw) * iw);
+  const sh = Math.max(1, Math.min(ih - sy, (h / t.dh) * ih));
+  ctx.drawImage(stripFrameImg, sx, sy, sw, sh, x, y, w, h);
+}
 
-  // 원래 긴 프레임의 해당 위치를 다시 사용해 가로 막대 전체를 프레임으로 채움.
-  ctx.drawImage(stripFrameImg, sx, sy, sw, sh, 0, y, W, height);
+// 원래 프레임 그림의 해당 위치를 다시 사용해 컷 사이 여백을 막대로 덮어서,
+// 사진 네 칸이 하나로 뭉개지지 않고 표처럼 분명하게 나뉘어 보이게 함.
+function drawStripSeparator(ctx, centerY, height, W, frameH) {
+  drawFrameRegion(ctx, W, frameH, 0, centerY - height / 2, W, height);
 }
 
 async function generateFrame() {
@@ -1330,31 +1216,19 @@ async function generateFrame() {
   }
   genFrameBtn.disabled = true;
   framePreview.style.display = 'none';
-  const isWholeStrip = selectedLayout === 'vertical';
-  frameStatus.textContent = isWholeStrip
-    ? '1×4 세로 프레임 전체를 준비하고 있어요...'
-    : '서로 다른 프레임 4개를 준비하고 있어요...';
+  frameStatus.textContent = '1×4 세로 프레임 전체를 준비하고 있어요...';
 
-  // 세로 모드는 사진 자리 네 개를 하나의 긴 마스크로 고정해 연속된 1x4 프레임을
-  // 만들고, 그리드 모드는 셀 네 개를 각각 만들어 2x2로 배치함.
-  const size = selectedLayout === '2x2' ? getStripGridSize() : getStripVerticalSize();
-  const { chipW, chipH, border, photoW, photoH, margin } = size;
-  const frameH = isWholeStrip ? size.H : chipH;
+  // AI 프레임 생성은 세로 1x4 모드에서만 지원함(패널 자체가 2x2에서는 숨겨짐).
+  // 사진 자리 네 개를 하나의 마스크로 고정해 캔버스 전체(W x H)를 한 번만
+  // 생성하고, 그 위 정해진 자리에 사진을 얹음.
+  const size = getStripVerticalSize();
+  const { W, H } = size;
   // 긴 원본 비율은 유지하되 생성 해상도를 낮춰 Beta 인페인팅 모델의
   // 검은 출력과 긴 처리 시간을 줄임.
-  const requestW = isWholeStrip ? 448 : Math.ceil(chipW / 8) * 8;
-  const requestH = isWholeStrip
-    ? Math.ceil((requestW * frameH / size.W) / 8) * 8
-    : Math.ceil(frameH / 8) * 8;
+  const requestW = 448;
+  const requestH = Math.ceil((requestW * H / W) / 8) * 8;
 
-  // 인페인팅 방식: 사진 자리를 "프롬프트로 부탁"하는 게 아니라 마스크로 직접
-  // 박아넣음. 검은색(마스크) = 사진 자리(+여백 margin), 절대 안 건드림 /
-  // 흰색(마스크) = 테두리, AI가 자유롭게 꾸밈. 그래서 프롬프트에는 크기·위치
-  // 얘기를 할 필요가 없고, "테두리만 꾸며줘"라고만 하면 됨 — 위치·크기는
-  // 100% 코드가 결정
-  const { baseCanvas, maskCanvas } = isWholeStrip
-    ? buildStripInpaintingAssets(size, requestW, requestH, styleRefImg)
-    : buildInpaintingAssets(chipW, chipH, border, photoW, photoH, margin, requestW, requestH, styleRefImg);
+  const { baseCanvas, maskCanvas } = buildStripInpaintingAssets(size, requestW, requestH, styleRefImg);
   const imageB64 = canvasToBase64Png(baseCanvas);
   const maskBytes = await canvasToByteArray(maskCanvas);
 
@@ -1366,9 +1240,7 @@ async function generateFrame() {
   const guardedBasePrompt = /storybook illustration|hand-drawn symbols|flat 2D/i.test(basePrompt)
     ? basePrompt
     : `${requiredDoodleStyle}, ${basePrompt}`;
-  const prompt = (isWholeStrip
-    ? `${guardedBasePrompt}, only one or two tiny isolated motifs across the entire strip, vast bare background`
-    : `${guardedBasePrompt}, only one tiny isolated motif per frame cell, vast bare background`) + styleRefSuffix;
+  const prompt = `${guardedBasePrompt}, only one or two tiny isolated motifs across the entire strip, vast bare background${styleRefSuffix}`;
 
   // negativePrompt는 negativePromptInput에서 직접 편집 가능. 비워두면
   // 안전한 기본값(DEFAULT_NEGATIVE_BASE)으로 되돌아감.
@@ -1381,98 +1253,64 @@ async function generateFrame() {
   const guardedNegativeBase = /photorealistic|photography|photograph/i.test(guardedToolNegative)
     ? guardedToolNegative
     : `${requiredNonPhotoNegative}, ${guardedToolNegative}`;
-  const negativePrompt = isWholeStrip
-    ? `${guardedNegativeBase}, empty canvas, rectangular openings, grid lines`
-    : `${guardedNegativeBase}, border overlapping the center, decorations crossing the inner edge, busy pattern near the center`;
+  const negativePrompt = `${guardedNegativeBase}, empty canvas, rectangular openings, grid lines`;
 
-  const compositionVariations = isWholeStrip ? [
-    'mostly plain border with isolated doodles'
-  ] : [
-    'top and upper corners emphasized',
-    'asymmetric side-focused arrangement',
-    'balanced corner accents',
-    'bottom and lower corners emphasized'
-  ];
-
-  // 그리드 모드는 4칸을 각각 따로 생성하는데, 매번 완전 랜덤 seed를 쓰면
-  // 같은 basePrompt를 줘도 칸마다 색감/톤이 미묘하게 어긋날 수 있음. 세션당
-  // 공통 seed를 베이스로 잡고 칸마다 작은 오프셋만 주면 같은 팔레트를
-  // 공유하면서 compositionVariations로만 구도 차이가 남.
-  const sessionSeed = Math.floor(Math.random() * 2000000000);
+  const seed = Math.floor(Math.random() * 2000000000);
   // 참고 이미지가 있을 때만 해당 이미지의 색과 구도를 보존함.
   const genStrength = styleRefImg ? 0.55 : 1;
   try {
-    const generatedFrames = [];
-    for (let i = 0; i < compositionVariations.length; i++) {
-      const maxAttempts = 3;
-      let acceptedFrame = null;
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        frameStatus.textContent = isWholeStrip
-          ? `1×4 세로 프레임 생성 중... (${attempt}/${maxAttempts})`
-          : `서로 다른 프레임 생성 중... (${i + 1}/4)`;
+    const maxAttempts = 3;
+    let acceptedFrame = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      frameStatus.textContent = `1×4 세로 프레임 생성 중... (${attempt}/${maxAttempts})`;
 
-        const res = await fetch('/api/generate-frame', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: `${prompt}, ${compositionVariations[i]}`,
-            negativePrompt,
-            width: requestW, height: requestH,
-            image: imageB64, mask: maskBytes,
-            seed: (sessionSeed + i * 97 + (attempt - 1) * 7919) % 2147483647,
-            strength: genStrength,
-            // guidance를 낮게 유지하면 텍스트 지시를 붙잡는 힘도 약해져서 어둡고
-            // 밀도 높은 결과로 흐르는 경향이 있었음. negativePrompt가 충분히
-            // 방어하고 있어서 8.0으로 밝기 유지
-            guidance: 8.0
-          })
-        });
+      const res = await fetch('/api/generate-frame', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `${prompt}, mostly plain border with isolated doodles`,
+          negativePrompt,
+          width: requestW, height: requestH,
+          image: imageB64, mask: maskBytes,
+          seed: (seed + (attempt - 1) * 7919) % 2147483647,
+          strength: genStrength,
+          // guidance를 낮게 유지하면 텍스트 지시를 붙잡는 힘도 약해져서 어둡고
+          // 밀도 높은 결과로 흐르는 경향이 있었음. negativePrompt가 충분히
+          // 방어하고 있어서 8.0으로 밝기 유지
+          guidance: 8.0
+        })
+      });
 
-        const data = await res.json();
-        if (!res.ok) {
-          const detail = data.detail ? ` (${JSON.stringify(data.detail)})` : '';
-          throw new Error((isWholeStrip ? '1×4 프레임: ' : `${i + 1}번째 프레임: `) + (data.error || `HTTP ${res.status}`) + detail);
-        }
-        if (!data.image) {
-          throw new Error(`${i + 1}번째 프레임 응답에서 이미지 데이터를 찾지 못했습니다.`);
-        }
-
-        const mime = data.mime || 'image/jpeg';
-        const dataUrl = `data:${mime};base64,${data.image}`;
-        let rawFrameImg = await loadImage(dataUrl);
-        const imageIssue = getGeneratedImageIssue(rawFrameImg);
-        if (imageIssue) {
-          frameStatus.textContent = `${imageIssue}: 다른 설정으로 다시 생성하고 있어요...`;
-          continue;
-        }
-        rawFrameImg = await removeDarkCast(rawFrameImg);
-        rawFrameImg.dataUrl = rawFrameImg.src;
-        acceptedFrame = isWholeStrip
-          ? rawFrameImg
-          : await normalizeGeneratedFrameImage(rawFrameImg, chipW, chipH);
-        break;
+      const data = await res.json();
+      if (!res.ok) {
+        const detail = data.detail ? ` (${JSON.stringify(data.detail)})` : '';
+        throw new Error('프레임 생성 실패: ' + (data.error || `HTTP ${res.status}`) + detail);
       }
-      if (!acceptedFrame) {
-        throw new Error('3번 시도했지만 지나치게 어두운 이미지만 반환됐습니다. 잠시 후 다시 시도해주세요.');
+      if (!data.image) {
+        throw new Error('응답에서 이미지 데이터를 찾지 못했습니다.');
       }
-      generatedFrames.push(acceptedFrame);
+
+      const mime = data.mime || 'image/jpeg';
+      const dataUrl = `data:${mime};base64,${data.image}`;
+      let rawFrameImg = await loadImage(dataUrl);
+      const imageIssue = getGeneratedImageIssue(rawFrameImg);
+      if (imageIssue) {
+        frameStatus.textContent = `${imageIssue}: 다른 설정으로 다시 생성하고 있어요...`;
+        continue;
+      }
+      acceptedFrame = await removeDarkCast(rawFrameImg);
+      acceptedFrame.dataUrl = acceptedFrame.src;
+      break;
+    }
+    if (!acceptedFrame) {
+      throw new Error('3번 시도했지만 지나치게 어두운 이미지만 반환됐습니다. 잠시 후 다시 시도해주세요.');
     }
 
-    if (isWholeStrip) {
-      stripFrameImg = generatedFrames[0];
-      stripFrameRequestSize = { width: requestW, height: requestH };
-      frameImgs = [];
-      framePreview.src = buildStripPreviewDataUrl(stripFrameImg, size);
-    } else {
-      frameImgs = generatedFrames;
-      stripFrameImg = null;
-      stripFrameRequestSize = null;
-      framePreview.src = frameImgs[0].normalizedDataUrl;
-    }
+    stripFrameImg = acceptedFrame;
+    stripFrameRequestSize = { width: requestW, height: requestH };
+    framePreview.src = buildStripPreviewDataUrl(stripFrameImg, size);
     framePreview.style.display = 'block';
-    frameStatus.textContent = isWholeStrip
-      ? '연결된 1×4 세로 프레임 생성 완료! 네 사진 자리를 하나의 긴 디자인이 감싸요.'
-      : '서로 다른 프레임 4개 생성 완료! 같은 테마 안에서 컷마다 장식 구도를 다르게 만들었어요.';
+    frameStatus.textContent = '연결된 1×4 세로 프레임 생성 완료! 네 사진 자리를 하나의 긴 디자인이 감싸요.';
   } catch (err) {
     // "Failed to fetch"는 서버가 아예 응답하지 않을 때(주소가 없거나, 백엔드가
     // 안 켜져 있을 때) 브라우저가 던지는 네트워크 레벨 에러. HTTP 에러(4xx/5xx)와
@@ -1492,7 +1330,6 @@ async function generateFrame() {
 }
 
 function clearFrame() {
-  frameImgs = [];
   stripFrameImg = null;
   stripFrameRequestSize = null;
   framePreview.style.display = 'none';
@@ -1557,7 +1394,7 @@ function composeVertical(images) {
 
     const r = hasFrame
       ? getPhotoRectInStrip(i, { photoW, photoH, border, margin, chipW, chipH, pad, gap, footerH, W, H })
-      : getPhotoRectInChip(chipX, chipY, chipW, chipH, border, photoW, photoH, margin, null);
+      : getPhotoRectInChip(chipX, chipY, chipW, chipH, border, photoW, photoH, margin);
     drawPhotoCoverFit(ctx, img, r.x, r.y, r.w, r.h, 0);
   });
 
@@ -1602,9 +1439,72 @@ function composeVertical(images) {
   ctx.restore();
 }
 
+// 2x2 배경 색상 입력을 실제 rgb로 바꿈. 캔버스는 한글 색 이름을 이해하지
+// 못하므로 흔한 한글 색 이름은 사전에서 먼저 찾고, 그 외(영어 이름/hex/rgb())는
+// 캔버스에 실제로 칠해봐서 브라우저가 유효한 CSS 색으로 인식하는지 확인함.
+const KOREAN_COLOR_MAP = {
+  '핑크': '#ff8fab', '분홍': '#ff8fab', '분홍색': '#ff8fab', '핑크색': '#ff8fab',
+  '파랑': '#4a90d9', '파란색': '#4a90d9', '파랑색': '#4a90d9', '블루': '#4a90d9',
+  '하늘색': '#6ec6ff', '하늘': '#6ec6ff', '스카이블루': '#6ec6ff',
+  '노랑': '#ffd54a', '노란색': '#ffd54a', '노랑색': '#ffd54a', '옐로우': '#ffd54a',
+  '초록': '#4caf7d', '초록색': '#4caf7d', '녹색': '#4caf7d', '그린': '#4caf7d',
+  '민트': '#4adbc0', '민트색': '#4adbc0',
+  '보라': '#9b6bcf', '보라색': '#9b6bcf', '자주색': '#9b6bcf', '퍼플': '#9b6bcf', '라벤더': '#b8a4e3',
+  '빨강': '#ff5f5f', '빨간색': '#ff5f5f', '빨강색': '#ff5f5f', '레드': '#ff5f5f',
+  '주황': '#ff9f4a', '주황색': '#ff9f4a', '오렌지': '#ff9f4a',
+  '검정': '#333333', '검은색': '#333333', '검정색': '#333333', '블랙': '#333333',
+  '흰색': '#f5f5f5', '하양': '#f5f5f5', '화이트': '#f5f5f5',
+  '베이지': '#e8d9c0', '갈색': '#a9754f', '브라운': '#a9754f',
+  '남색': '#2b4a8f', '네이비': '#2b4a8f', '회색': '#9a9a9a', '그레이': '#9a9a9a'
+};
+
+function isValidCssColor(value) {
+  const ctx = document.createElement('canvas').getContext('2d');
+  ctx.fillStyle = '#010203';
+  ctx.fillStyle = value;
+  return ctx.fillStyle !== '#010203' || value.toLowerCase() === '#010203';
+}
+
+function cssColorToRgb(value) {
+  const c = document.createElement('canvas');
+  c.width = 1;
+  c.height = 1;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = value;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  return { r, g, b };
+}
+
+const GRID_DEFAULT_RGB = { r: 255, g: 143, b: 171 }; // #ff8fab, 기존 기본 핑크
+
+function resolveGridColorRgb(rawInput) {
+  const input = (rawInput || '').trim();
+  if (!input) return GRID_DEFAULT_RGB;
+  const key = input.replace(/\s+/g, '');
+  const probe = KOREAN_COLOR_MAP[key] || input;
+  if (!isValidCssColor(probe)) return GRID_DEFAULT_RGB;
+  return cssColorToRgb(probe);
+}
+
+function mixRgb(rgb, target, amt) {
+  return {
+    r: rgb.r + (target.r - rgb.r) * amt,
+    g: rgb.g + (target.g - rgb.g) * amt,
+    b: rgb.b + (target.b - rgb.b) * amt
+  };
+}
+
+function rgbToCss({ r, g, b }) {
+  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+}
+
+// 2x2는 AI 프레임 생성 기능 없이 항상 깔끔한 기본 디자인(그라데이션 + 반짝이 +
+// 흰 사진 카드)만 사용함. 배경색은 gridColorInput에 적은 값(한글/영어/hex)을
+// 따라가고, 안 적으면 기존 기본 핑크로 나감.
 function composeGrid(images) {
-  const { photoW, photoH, border, margin, chipW, chipH, stripW, outerPad, colGap, rowGap, footerH, W, H } = getStripGridSize();
-  const hasFrame = frameImgs.length === 4;
+  const size = getStripGridSize();
+  const { photoW, photoH, border, margin, chipW, chipH, stripW, outerPad, colGap, footerH, W, H } = size;
 
   finalCanvas.width = W * OUTPUT_SCALE;
   finalCanvas.height = H * OUTPUT_SCALE;
@@ -1613,40 +1513,48 @@ function composeGrid(images) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  ctx.fillStyle = hasFrame ? '#fdf2f6' : '#111';
-  ctx.fillRect(0, 0, W, H);
+  const baseRgb = resolveGridColorRgb(document.getElementById('gridColorInput').value);
+  const lightRgb = mixRgb(baseRgb, { r: 255, g: 255, b: 255 }, 0.55);
+  const darkRgb = mixRgb(baseRgb, { r: 0, g: 0, b: 0 }, 0.12);
+  // 밝은 배경(노랑/흰색 등)에서는 흰 글씨/반짝이가 안 보이므로 배경 밝기에 따라
+  // 글씨·반짝이 색을 자동으로 진하게/밝게 바꿈.
+  const isLight = (0.299 * baseRgb.r + 0.587 * baseRgb.g + 0.114 * baseRgb.b) > 175;
+  const inkRgb = isLight ? { r: 60, g: 45, b: 50 } : { r: 255, g: 255, b: 255 };
+  const inkCss = rgbToCss(inkRgb);
 
-  for (let i = 0; i < 4; i++) {
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, rgbToCss(lightRgb));
+  grad.addColorStop(1, rgbToCss(darkRgb));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  drawSparkleField(ctx, W, H, outerPad, inkRgb);
+
+  images.forEach((img, i) => {
     const col = i % 2;
     const row = Math.floor(i / 2);
     const x = outerPad + col * (chipW + stripW + colGap);
     const y = outerPad + row * chipH;
-    const activeFrame = frameImgs[i];
 
-    if (hasFrame) {
-      drawFrameCover(ctx, activeFrame, x, y, chipW, chipH, 0);
-    } else {
-      ctx.fillStyle = '#fff';
-      roundRectPath(ctx, x + border - 6, y + border - 6, photoW + 12, photoH + 12, 0);
-      ctx.fill();
-    }
+    ctx.fillStyle = '#fff';
+    roundRectPath(ctx, x + border - 6, y + border - 6, photoW + 12, photoH + 12, 0);
+    ctx.fill();
 
-    const r = getPhotoRectInChip(x, y, chipW, chipH, border, photoW, photoH, margin, activeFrame);
-    drawPhotoCoverFit(ctx, images[i], r.x, r.y, r.w, r.h, 0);
+    const r = getPhotoRectInChip(x, y, chipW, chipH, border, photoW, photoH, margin);
+    drawPhotoCoverFit(ctx, img, r.x, r.y, r.w, r.h, 0);
 
     // 오른쪽 세로 텍스트 (번호 + 장식 문구)
     ctx.save();
     ctx.translate(x + chipW + stripW / 2, y + chipH / 2);
     ctx.rotate(Math.PI / 2);
-    ctx.fillStyle = hasFrame ? '#7a5c66' : '#fff';
+    ctx.fillStyle = inkCss;
     ctx.textAlign = 'center';
     ctx.font = '11px sans-serif';
     const num = String(Math.floor(Math.random() * 90 + 10));
     ctx.fillText(`${num}   ▾   TAKE YOUR MEMORY`, 0, 4);
     ctx.restore();
-  }
+  });
 
-  ctx.fillStyle = hasFrame ? '#ff5f96' : '#fff';
+  ctx.fillStyle = inkCss;
   ctx.textAlign = 'center';
   ctx.font = 'bold 20px sans-serif';
   const title = (titleInput.value.trim() || 'StoryBooth').toUpperCase();

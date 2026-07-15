@@ -80,6 +80,13 @@
 | 4컷 합성·다운로드 | 촬영 사진 4장을 생성된 프레임과 캔버스에서 합성해 다운로드 |
 | AWS 배포 | Express 백엔드를 AWS App Runner에 배포, Cloudflare 인증값은 Secrets Manager로 관리 |
 
+---
+
+## 화면 설계서
+
+<p align="center">
+  <img src="assets/storybooth-screen-flow.png" alt="StoryBooth 화면 설계 및 사용자 흐름" width="100%">
+</p>
 
 ---
 

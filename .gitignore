@@ -1,0 +1,6 @@
+.DS_Store
+.env
+4cut_demo/.env
+ai4cut/.env
+test/.env
+test/node_modules/

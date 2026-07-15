@@ -1,0 +1,17 @@
+{
+  "name": "ai-four-cut-backend",
+  "version": "1.0.0",
+  "description": "AI 인생네컷 - AI 프레임 생성 백엔드 (Cloudflare Workers AI REST API 프록시)",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

@@ -455,9 +455,6 @@
       <button class="btn-secondary" id="clearFrameBtn">기본으로</button>
     </div>
     <div class="option-status" id="frameStatus">사진 자리 4개가 뚫린 긴 1×4 프레임을 하나로 이어서 생성해요.</div>
-    <div id="livePreviewWrap" style="display:none; text-align:center; margin-top: 14px;">
-      <canvas id="livePreviewCanvas"></canvas>
-    </div>
   </div>
   <div class="option-card" id="gridColorPanel" style="display:none;">
     <h2>🎨 2x2 배경 색상</h2>
@@ -465,6 +462,13 @@
       <input type="text" id="gridColorInput" placeholder="예: 핑크, 하늘색, 노랑, blue, #3498db" />
     </div>
     <div class="option-status">AI 프레임 없이 깔끔한 배경색만 적용돼요. 한글로 적어도 되고, 비워두면 기본 핑크로 나가요.</div>
+  </div>
+
+  <!-- 1x4/2x2 공통 미리보기 자리. frameGenPanel과 gridColorPanel은 레이아웃에 따라
+       서로 배타적으로 display:none 처리되므로, 그 사이 이 자리 하나만 둬도
+       항상 "현재 보이는 패널 바로 아래"에 자연스럽게 나온다. -->
+  <div id="livePreviewWrap" style="display:none; text-align:center; margin: 14px 0;">
+    <canvas id="livePreviewCanvas"></canvas>
   </div>
 
   <div class="option-card" id="universityPanel">
@@ -2555,7 +2559,7 @@ clearFrameBtn.addEventListener('click', clearFrame);
 const UNIVERSITY_PRESETS = [
   { key: 'snu', aliases: ['서울대', '서울대학교', 'snu', 'seoul national university'], color: '#003876', englishName: 'SEOUL NATIONAL UNIVERSITY', initial: 'SNU' },
   { key: 'yonsei', aliases: ['연세대', '연세대학교', 'yonsei', 'yonsei university'], color: '#00205b', englishName: 'YONSEI UNIVERSITY', initial: 'Y' },
-  { key: 'korea', aliases: ['고려대', '고려대학교', 'ku', 'korea university'], color: '#8b1e3f', englishName: 'KOREA UNIVERSITY', initial: 'KU' },
+  { key: 'korea', aliases: ['고려대', '고려대학교', 'ku', 'korea university'], color: '#971e23', englishName: 'KOREA UNIVERSITY', initial: 'KU' },
   { key: 'kaist', aliases: ['카이스트', 'kaist'], color: '#0a3161', englishName: 'KAIST', initial: 'K' },
   { key: 'hanyang', aliases: ['한양대', '한양대학교', 'hanyang', 'hanyang university'], color: '#004a93', englishName: 'HANYANG UNIVERSITY', initial: 'H' },
   { key: 'ewha', aliases: ['이화여대', '이화여자대학교', 'ewha', 'ewha womans university'], color: '#1f5c3f', englishName: 'EWHA WOMANS UNIVERSITY', initial: 'E' },

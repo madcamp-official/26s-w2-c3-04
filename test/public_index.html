@@ -363,14 +363,31 @@ function shuffle(arr) {
   }
   return a;
 }
-const chosenGestures = shuffle(GESTURES).slice(0, 4);
-
-// 뽑힌 각 제스처를 2번씩 촬영한다 (총 8장).
+// ⚠️⚠️ 임시 꽃받침 테스트 모드 — 커밋 전에 이 블록을 통째로 삭제하고
+// 아래 원본 코드의 주석을 해제할 것! (DEBUG_POSE도 false로 되돌리기)
+const TEMP_FLOWER_TEST = true;
+const chosenGestures = TEMP_FLOWER_TEST
+  ? [GESTURES.find(g => g.id === 'flower')]
+  : shuffle(GESTURES).slice(0, 4);
 const sequence = [];
-chosenGestures.forEach(g => {
-  sequence.push({ ...g, round: 1 });
-  sequence.push({ ...g, round: 2 });
-});
+if (TEMP_FLOWER_TEST) {
+  for (let round = 1; round <= 8; round++) {
+    sequence.push({ ...chosenGestures[0], round });
+  }
+} else {
+  chosenGestures.forEach(g => {
+    sequence.push({ ...g, round: 1 });
+    sequence.push({ ...g, round: 2 });
+  });
+}
+// 원본 코드 (임시 블록 삭제 후 복원):
+// const chosenGestures = shuffle(GESTURES).slice(0, 4);
+// // 뽑힌 각 제스처를 2번씩 촬영한다 (총 8장).
+// const sequence = [];
+// chosenGestures.forEach(g => {
+//   sequence.push({ ...g, round: 1 });
+//   sequence.push({ ...g, round: 2 });
+// });
 
 const COUNTDOWN_MS = 3000;
 const RESET_GAP_MS = 1200;         // 촬영 후 다음 동작 준비 텀
@@ -383,7 +400,8 @@ const FAILURE_GRACE_MS = 400;      // 순간적인 인식 실패는 400ms까지 
 
 // 개발자용 디버그 플래그. true로 켜면 각 판정 함수의 내부 값(간격비·각도·점수)이
 // 0.5초마다 화면 로그에 출력돼 문턱값 튜닝에 쓸 수 있다. 배포 시엔 false로 둔다.
-const DEBUG_POSE = false;
+// ⚠️ 임시 꽃받침 테스트 중이라 true — 커밋 전에 false로 되돌릴 것!
+const DEBUG_POSE = true;
 
 // ---------- 상태 ----------
 let handLandmarker = null;
@@ -468,12 +486,6 @@ async function init() {
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
-function isFingerExtended(lm, tipIdx, pipIdx) {
-  return (lm[pipIdx].y - lm[tipIdx].y) > 0.02;
-}
-function isFingerCurled(lm, tipIdx, pipIdx) {
-  return !isFingerExtended(lm, tipIdx, pipIdx);
-}
 function wristDist(lm, idx) {
   return dist(lm[idx], lm[0]);
 }
@@ -531,12 +543,33 @@ function palmFacingScore(lm, handednessLabel) {
 // 나오고, 옆으로 돌리면 0 근처로 떨어진다. 낮추면 관대해지고 높이면 엄격해짐.
 const TIGER_PALM_FACING_MIN = 0.25;
 
+// 브이: 검지·중지는 펴고 약지·소지는 접기.
+// 예전엔 "손끝이 관절보다 화면에서 위"(y좌표 비교)로 펴짐을 판정해서 손을
+// 옆으로 기울이면 인식이 안 됐음. 기울기와 무관한 3D 관절각 + 손목거리비로
+// 교체하고, 방향은 "손끝이 아래로 뒤집히지만 않으면" 허용한다
+// (수직에서 100도 이내 = 옆으로 90도 눕힌 브이까지 OK. 뒤집힌 브이는 야호 포즈).
 function vComponent(lm) {
-  const indexExt = isFingerExtended(lm, 8, 6);
-  const middleExt = isFingerExtended(lm, 12, 10);
-  const ringCurl = isFingerCurled(lm, 16, 14);
-  const pinkyCurl = isFingerCurled(lm, 20, 18);
-  return indexExt && middleExt && ringCurl && pinkyCurl;
+  const indexAngle = fingerBendAngle3D(lm, 5, 6, 8);
+  const middleAngle = fingerBendAngle3D(lm, 9, 10, 12);
+  const extendedOk = indexAngle > 140 && middleAngle > 140 &&
+    curlRatio(lm, 8, 5) > 1.25 && curlRatio(lm, 12, 9) > 1.25;
+  // 접힘은 거리비/관절각 중 하나만 만족해도 인정 (랜드마크 노이즈 허용)
+  const ringFolded = curlRatio(lm, 16, 13) < 1.25 || fingerBendAngle3D(lm, 13, 14, 16) < 120;
+  const pinkyFolded = curlRatio(lm, 20, 17) < 1.25 || fingerBendAngle3D(lm, 17, 18, 20) < 120;
+  // 검지·중지 평균 방향(뿌리→끝)의 수직 기준 기울기
+  const dirX = (lm[8].x - lm[5].x) + (lm[12].x - lm[9].x);
+  const dirY = (lm[8].y - lm[5].y) + (lm[12].y - lm[9].y);
+  const dirLen = Math.hypot(dirX, dirY) || 0.001;
+  const tiltDeg = Math.acos(Math.min(1, Math.max(-1, -dirY / dirLen))) * 180 / Math.PI;
+  const notDownward = tiltDeg <= 100;
+  if (DEBUG_POSE) {
+    window.__poseDebug =
+      `브이 · 편 손가락 관절각(각 140 초과): ${indexAngle.toFixed(0)} / ${middleAngle.toFixed(0)}` +
+      ` · 펴짐거리비(각 1.25 초과): ${curlRatio(lm, 8, 5).toFixed(2)} / ${curlRatio(lm, 12, 9).toFixed(2)}` +
+      ` · 접힘(약지/소지): ${ringFolded ? 'O' : 'X'} / ${pinkyFolded ? 'O' : 'X'}` +
+      ` · 기울기(100도 이하): ${tiltDeg.toFixed(0)}도`;
+  }
+  return extendedOk && ringFolded && pinkyFolded && notDownward;
 }
 
 // 3D 관절 각도: fingerBendAngle의 z 포함 버전. 손이 카메라 쪽으로 기울어
@@ -751,9 +784,11 @@ function flowerComponent(lm, handedness) {
   const angRing = fingerBendAngle3D(lm, 13, 14, 16);
   const angPinky = fingerBendAngle3D(lm, 17, 18, 20);
   const avgAngle = (angIdx + angMid + angRing + angPinky) / 4;
-  // 하한 125도: 손바닥이 카메라 쪽으로 조금 돌아가면 오므린 손가락이 카메라를
-  // 향해 관절각이 더 접힌 값으로 나오므로, 135로 두면 손바닥 보이는 꽃받침이 탈락했음.
-  const allExt = avgAngle > 125;
+  // 하한 130도: "살짝 감싼" 꽃받침까지만 허용한다. 실측상 정당한 꽃받침은
+  // 뺨에 붙여도 168~177도로 나와서 여유가 크고, 볼하트처럼 반원으로 많이
+  // 오므린 손(130도 미만)과 주먹(60~90도)은 여기서 걸러진다.
+  // (한때 105까지 내렸더니 볼하트 자세가 꽃받침으로 오인식됐음)
+  const allExt = avgAngle > 130;
   // 이웃한 손끝끼리 붙어 있는지 (손 크기 비율 — 붙인 손가락은 약 0.1, 벌리면 0.2+)
   const span = handSpan2D(lm);
   const g1 = dist(lm[8], lm[12]) / span;
@@ -762,31 +797,42 @@ function flowerComponent(lm, handedness) {
   // 0.22: 손바닥이 카메라 쪽으로 돌아가면 원근 때문에 손 크기 대비 간격비가
   // 커져서, 0.18로는 손바닥 보이는 꽃받침이 탈락했음 (벌린 손가락은 0.25+).
   const closeGaps = g1 < 0.22 && g2 < 0.22 && g3 < 0.22;
+  // 엄지도 손에 붙어 있어야 함: 꽃받침은 "네 손가락 + 엄지"가 다 함께
+  // 붙은 모양이 기본형인데, 예전엔 엄지를 아예 검사하지 않아서 손을 그냥
+  // 얼굴에 대고 엄지만 벌어진 자세(꽃받침 아님)도 통과했었다.
+  // 검지 끝 하나와의 거리만 보면, 엄지가 다른 손가락에 가려질 때 추정
+  // 랜드마크가 튀어 판정이 깜빡였음. 가려진 엄지는 손바닥 근처로 추정되는
+  // 경향이 있으므로 검지 끝(8)·검지 뿌리(5)·중지 뿌리(9) 중 최소 거리를
+  // 쓴다 — 일부러 벌린 엄지는 셋 다 멀어서 여전히 걸러진다.
+  const thumbGap = Math.min(dist(lm[4], lm[8]), dist(lm[4], lm[5]), dist(lm[4], lm[9])) / span;
+  const thumbClose = thumbGap < 0.3;
   // 손끝이 손목보다 위 = 컵이 위를 향한 방향 (턱을 받치는 모양)
   const pointingUp = lm[8].y < lm[0].y && lm[12].y < lm[0].y && lm[16].y < lm[0].y && lm[20].y < lm[0].y;
-  // 손 축(손목→중지 끝)이 수직에서 20도 이상 기울어야 함: 꽃받침은 턱을
-  // 받치느라 손이 얼굴 쪽으로 기울지만, 손가락을 붙여 편 손을 그냥 위로
-  // 세워 든 자세는 수직(0도 근처)이라 여기서 걸러진다.
+  // 손 방향 거름망. 손가락이 굽어 있으면(관절각 평균 160 미만) 얼굴을 감싸는
+  // 중이라는 강한 신호라 기울기와 무관하게 인정한다. 쫙 편 손은 기울기가
+  // 8~35도일 때만 인정한다:
+  //  - 8도 이하 = 편 손을 그냥 수직으로 세워 든 자세 (꽃받침 아님)
+  //  - 35도 초과 = 얼굴 반대쪽으로 눕혀 내민 자세 (실측 39~42도에서 오인식됐음.
+  //    정당한 꽃받침은 12~18도로 나옴. 손 랜드마크만으론 "얼굴 쪽" 기울기인지
+  //    알 수 없어 각도 크기로 근사한다)
   const axisX = lm[12].x - lm[0].x;
   const axisY = lm[12].y - lm[0].y;
   const axisLen = Math.hypot(axisX, axisY) || 0.001;
   const handTiltDeg = Math.acos(Math.min(1, Math.max(-1, -axisY / axisLen))) * 180 / Math.PI;
-  const tiltedEnough = handTiltDeg > 20;
-  // 손등이 카메라를 정면으로 향하면 꽃받침이 아니라 손등을 내민 자세.
-  // 손바닥 정면 = 양수, 옆으로 세움 = 0 근처, 손등 정면 = -0.4 이하로 나오므로
-  // -0.25까지는 허용해 "손등이 살짝 보이는" 각도는 통과시킨다.
-  const palmScore = palmFacingScore(lm, handedness);
-  const notBackFacing = palmScore > -0.25;
+  const tiltedEnough = (handTiltDeg > 8 && handTiltDeg <= 35) || avgAngle < 160;
+  // 손등 방향 제한은 두지 않는다: 뺨에 손을 붙이는 꽃받침은 손바닥이 얼굴을
+  // 향해 카메라에 손등이 정면으로 보이는 게 정상이라(실측 손바닥점수 -0.45),
+  // 어떤 문턱을 걸어도 정당한 자세를 같이 쳐냈음. 손 모양 조건들로만 거른다.
   if (DEBUG_POSE) {
     window.__poseDebug =
-      `꽃받침 · 관절각 평균(125 초과 필요): ${avgAngle.toFixed(0)}` +
+      `꽃받침 · 관절각 평균(130 초과 필요): ${avgAngle.toFixed(0)}` +
       ` (검지 ${angIdx.toFixed(0)} 중지 ${angMid.toFixed(0)} 약지 ${angRing.toFixed(0)} 소지 ${angPinky.toFixed(0)})` +
       ` · 손끝간격비(각 0.22 미만): ${g1.toFixed(2)} ${g2.toFixed(2)} ${g3.toFixed(2)}` +
+      ` · 엄지간격비(0.3 미만): ${thumbGap.toFixed(2)} → ${thumbClose ? 'O' : 'X'}` +
       ` · 손끝이위: ${pointingUp ? 'O' : 'X'}` +
-      ` · 손기울기(20도 초과 필요): ${handTiltDeg.toFixed(0)}도` +
-      ` · 손바닥점수(-0.25 초과 필요): ${palmScore.toFixed(2)}`;
+      ` · 손기울기(8~35도 또는 관절각 160 미만): ${handTiltDeg.toFixed(0)}도 → ${tiltedEnough ? 'O' : 'X'}`;
   }
-  return allExt && closeGaps && pointingUp && tiltedEnough && notBackFacing;
+  return allExt && closeGaps && thumbClose && pointingUp && tiltedEnough;
 }
 
 // 숭이포즈: 검지손가락 끝이 입꼬리(입 주변) 높이에 있으면 인정.
@@ -930,7 +976,10 @@ function smoothDetection(ok, handCount, gestureId) {
   const hitCount = detectionHistory.filter(h => h.ok && h.handCount >= expectedHands).length;
   // 손이 4개 이상 잡히는 다인 촬영은 어떤 포즈든 한 손씩 검출이 자주 깜빡여
   // 프레임 단위 실패가 잦으므로 완화 기준을 적용한다 (1~2인 판정은 그대로).
-  const requiredHits = gestureId === 'yahoo' || SPECIAL_CHECKERS[gestureId] || expectedHands >= 4
+  // 꽃받침은 엄지가 다른 손가락에 가려질 때 엄지 랜드마크가 프레임 단위로
+  // 튀므로, 야호·양손 결합 포즈와 같은 완화 기준을 적용한다.
+  const requiredHits = gestureId === 'yahoo' || gestureId === 'flower' ||
+    SPECIAL_CHECKERS[gestureId] || expectedHands >= 4
     ? RELAXED_DETECTION_REQUIRED_HITS
     : DETECTION_REQUIRED_HITS;
   return hitCount >= requiredHits;
